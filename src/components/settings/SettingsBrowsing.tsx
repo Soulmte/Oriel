@@ -3,6 +3,7 @@ import { SFListBullet, SFSquareGrid2x2 } from "sf-symbols-lib/dualtone";
 import { useExplorer } from "../../store/explorer";
 import {
   SEGMENT_CLASS,
+  SEGMENT_TRACK,
   SettingsPageHeader,
   SettingsRow,
   SettingsSection,
@@ -47,7 +48,7 @@ export function SettingsBrowsing() {
               if (next === "grid" || next === "list") setView(next);
             }}
             size="sm"
-            className="rounded-lg border border-mac-line bg-mac-chrome p-0.5"
+            className={SEGMENT_TRACK}
           >
             <ToggleButton id="grid" className={SEGMENT_CLASS}>
               <SFSquareGrid2x2 size={14} />
@@ -71,7 +72,7 @@ export function SettingsBrowsing() {
               if (next === "last" || next === "home") setStartLocation(next);
             }}
             size="sm"
-            className="rounded-lg border border-mac-line bg-mac-chrome p-0.5"
+            className={SEGMENT_TRACK}
           >
             <ToggleButton id="last" className={SEGMENT_CLASS}>
               上次位置

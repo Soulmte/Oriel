@@ -40,6 +40,8 @@ import {
   searchDirectory,
   statOrThrow,
 } from "../lib/fs-utils.js";
+import { buildOfficeTemplate } from "../lib/ooxml.js";
+import type { OfficeTemplate } from "../lib/ooxml.js";
 import {
   assertSafeToDelete,
   normalizePath,
@@ -711,6 +713,24 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
       throw ApiError.badRequest("INVALID_BODY", "初始内容过大");
     }
     const created = await createFile(target, name, raw);
+    return { path: created };
+  });
+
+  app.post("/fs/new-office-file", async (request) => {
+    const body = (request.body ?? {}) as Body & { template?: unknown };
+    assertNotArchive(body.path);
+    const target = normalizePath(body.path);
+    assertWritable(target);
+    const name = validateEntryName(body.name);
+    const template = String(body.template ?? "");
+    if (template !== "docx" && template !== "xlsx" && template !== "pptx") {
+      throw ApiError.badRequest(ERROR_CODES.invalidName, "不支持的文档模板");
+    }
+    if (!name.toLowerCase().endsWith(`.${template}`)) {
+      throw ApiError.badRequest(ERROR_CODES.invalidName, `扩展名必须是 .${template}`);
+    }
+    // A real OOXML package: an empty file with a .docx name would not open.
+    const created = await createFile(target, name, buildOfficeTemplate(template as OfficeTemplate));
     return { path: created };
   });
 

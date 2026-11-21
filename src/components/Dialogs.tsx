@@ -1,9 +1,27 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, CopyX, FilePlus, FolderPlus, Pencil, Trash2 } from "lucide-react";
-import { Button, Input, Label, Modal } from "@heroui/react";
+import { Button, Input, Modal } from "@heroui/react";
 import type { ConflictPolicy } from "@oriel/shared";
 import { useExplorer } from "../store/explorer";
 import { basename } from "../lib/format";
+
+/** macOS alert shape: a small sheet, a centred title, buttons bottom-right. */
+const DIALOG = "w-[380px] max-w-[380px] gap-0! rounded-[12px] p-0!";
+const HEADER = "justify-center px-5 pb-0 pt-4";
+const HEADING = "text-center text-[13px] font-semibold text-mac-text";
+const BODY = "px-5 pb-0 pt-2.5";
+const FOOTER = "flex-nowrap justify-end gap-2 px-5 pb-4 pt-4";
+
+const BUTTON = "h-7 min-w-[72px] rounded-[6px] px-3 text-[12.5px] font-normal";
+const PRIMARY = `${BUTTON} bg-mac-blue text-white data-[hovered=true]:bg-mac-blue/90`;
+const SECONDARY = `${BUTTON} bg-mac-surface text-mac-text shadow-[0_0_0_1px_var(--color-mac-line)] data-[hovered=true]:bg-black/[0.04] dark:data-[hovered=true]:bg-white/[0.08]`;
+const DESTRUCTIVE = `${BUTTON} bg-[#ff3b30] text-white data-[hovered=true]:bg-[#ff3b30]/90`;
+const DANGER_TEXT = "text-red-600 dark:text-red-400";
+
+/** Text field in the alert, same language as the settings fields. */
+const INPUT =
+  "h-7 rounded-[6px] bg-mac-surface px-2 text-[12.5px] text-mac-text " +
+  "shadow-[0_0_0_1px_var(--color-mac-line)] outline-none transition-[box-shadow] duration-100 " +
+  "focus:shadow-[0_0_0_1px_var(--color-mac-blue),0_0_0_3px_var(--color-mac-blue-soft)]";
 
 export function Dialogs() {
   const dialog = useExplorer((state) => state.dialog);
@@ -23,7 +41,7 @@ export function Dialogs() {
     if (dialog?.kind === "new-folder") {
       setValue("未命名文件夹");
     } else if (dialog?.kind === "new-file") {
-      setValue(`新建 ${dialog.label}.${dialog.extension}`);
+      setValue(`${dialog.suggested ?? `新建${dialog.label}`}.${dialog.extension}`);
     } else if (dialog?.kind === "rename") {
       setValue(dialog.entry.name);
     } else {
@@ -59,7 +77,7 @@ export function Dialogs() {
       dialog.kind === "new-folder"
         ? await createFolder(trimmed)
         : dialog.kind === "new-file"
-          ? await createFile(trimmed, dialog.content)
+          ? await createFile(trimmed, dialog.content, dialog.template)
           : await renameEntry(trimmed);
     setBusy(false);
 
@@ -73,6 +91,8 @@ export function Dialogs() {
     await submitTransfer(action, sources, target, policy);
   };
 
+  const isDelete = Boolean(purgeDialog || removeDialog);
+
   return (
     <Modal.Backdrop
       isOpen={isOpen}
@@ -81,38 +101,34 @@ export function Dialogs() {
       }}
     >
       <Modal.Container placement="center">
-        <Modal.Dialog className="sm:max-w-[440px]">
+        <Modal.Dialog className={DIALOG}>
           {errorDialog ? (
             <>
-              <Modal.Header>
-                <Modal.Icon className="bg-[#ff9f0a]/15 text-[#ff9f0a]">
-                  <AlertTriangle className="size-5" />
-                </Modal.Icon>
-                <Modal.Heading>操作失败</Modal.Heading>
+              <Modal.Header className={HEADER}>
+                <Modal.Heading className={HEADING}>操作失败</Modal.Heading>
               </Modal.Header>
-              <Modal.Body>
-                <p className="select-text text-[13px] leading-6 text-mac-muted">
+              <Modal.Body className={BODY}>
+                <p className="select-text text-[12px] leading-5 text-mac-muted">
                   {errorDialog.message}
                 </p>
               </Modal.Body>
-              <Modal.Footer>
-                <Button onPress={closeDialog}>好</Button>
+              <Modal.Footer className={FOOTER}>
+                <Button className={PRIMARY} onPress={closeDialog}>
+                  好
+                </Button>
               </Modal.Footer>
             </>
           ) : conflictDialog ? (
             <>
-              <Modal.Header>
-                <Modal.Icon className="bg-[#ff9f0a]/15 text-[#ff9f0a]">
-                  <CopyX className="size-5" />
-                </Modal.Icon>
-                <Modal.Heading>发现同名项目</Modal.Heading>
+              <Modal.Header className={HEADER}>
+                <Modal.Heading className={HEADING}>发现同名项目</Modal.Heading>
               </Modal.Header>
 
-              <Modal.Body>
-                <p className="text-[13px] leading-6 text-mac-muted">
-                  目标位置已有 {conflictDialog.conflicts.length} 个同名项目，选择处理方式：
+              <Modal.Body className={BODY}>
+                <p className="text-[12px] leading-5 text-mac-muted">
+                  目标位置已有 {conflictDialog.conflicts.length} 个同名项目
                 </p>
-                <ul className="mt-2.5 max-h-[120px] space-y-0.5 overflow-y-auto rounded-lg bg-black/[0.04] px-2.5 py-1.5 text-[12px] dark:bg-white/[0.05]">
+                <ul className="mt-2 max-h-[116px] space-y-0.5 overflow-y-auto rounded-[8px] bg-black/[0.04] px-2.5 py-1.5 text-[12px] dark:bg-white/[0.06]">
                   {conflictDialog.conflicts.slice(0, 6).map((item) => (
                     <li key={item.destination} className="truncate text-mac-text">
                       {basename(item.destination)}
@@ -124,54 +140,46 @@ export function Dialogs() {
                     </li>
                   )}
                 </ul>
-                <p className="mt-2.5 text-[11px] leading-5 text-mac-muted/80">
-                  「替换」会删除已有的同名项目，无法撤销。
+                <p className="mt-2 text-[11px] leading-4 text-mac-muted/80">
+                  「替换」会删除已有的同名项目，无法撤销
                 </p>
               </Modal.Body>
 
-              <Modal.Footer className="flex-nowrap">
-                <Button variant="ghost" onPress={closeDialog}>
+              <Modal.Footer className={FOOTER}>
+                <Button className={SECONDARY} onPress={closeDialog}>
                   取消
                 </Button>
-                <span className="flex-1" />
-                <Button variant="tertiary" onPress={() => void resolveConflict("skip")}>
+                <Button className={SECONDARY} onPress={() => void resolveConflict("skip")}>
                   跳过
                 </Button>
-                <Button
-                  variant="danger-soft"
-                  onPress={() => void resolveConflict("overwrite")}
-                >
+                <Button className={DANGER_TEXT + " bg-transparent shadow-none"} onPress={() => void resolveConflict("overwrite")}>
                   替换
                 </Button>
-                <Button onPress={() => void resolveConflict("rename")}>保留两者</Button>
+                <Button className={PRIMARY} onPress={() => void resolveConflict("rename")}>
+                  保留两者
+                </Button>
               </Modal.Footer>
             </>
           ) : purgeDialog ? (
             <>
-              <Modal.Header>
-                <Modal.Icon className="bg-[#ff3b30]/15 text-[#ff3b30]">
-                  <Trash2 className="size-5" />
-                </Modal.Icon>
-                <Modal.Heading>
+              <Modal.Header className={HEADER}>
+                <Modal.Heading className={HEADING}>
                   {purgeDialog.all ? "清空废纸篓？" : "永久删除？"}
                 </Modal.Heading>
               </Modal.Header>
-
-              <Modal.Body>
-                <p className="text-[13px] leading-6 text-mac-muted">
+              <Modal.Body className={BODY}>
+                <p className="text-center text-[12px] leading-5 text-mac-muted">
                   {purgeDialog.all
-                    ? "将永久删除废纸篓中的所有项目，此操作无法撤销。"
-                    : `将永久删除 ${purgeDialog.ids.length} 个项目，此操作无法撤销。`}
+                    ? "将永久删除废纸篓中的所有项目，此操作无法撤销"
+                    : `将永久删除 ${purgeDialog.ids.length} 个项目，此操作无法撤销`}
                 </p>
               </Modal.Body>
-
-              <Modal.Footer>
-                <Button variant="ghost" onPress={closeDialog}>
+              <Modal.Footer className={FOOTER}>
+                <Button className={SECONDARY} onPress={closeDialog}>
                   取消
                 </Button>
-                <span className="flex-1" />
                 <Button
-                  variant="danger-soft"
+                  className={DESTRUCTIVE}
                   onPress={() => {
                     const { ids, all } = purgeDialog;
                     closeDialog();
@@ -185,18 +193,14 @@ export function Dialogs() {
             </>
           ) : removeDialog ? (
             <>
-              <Modal.Header>
-                <Modal.Icon className="bg-[#ff3b30]/15 text-[#ff3b30]">
-                  <Trash2 className="size-5" />
-                </Modal.Icon>
-                <Modal.Heading>永久删除？</Modal.Heading>
+              <Modal.Header className={HEADER}>
+                <Modal.Heading className={HEADING}>永久删除？</Modal.Heading>
               </Modal.Header>
-
-              <Modal.Body>
-                <p className="text-[13px] leading-6 text-mac-muted">
-                  将永久删除 {removeDialog.paths.length} 个项目，文件不会进入废纸篓，也无法撤销。
+              <Modal.Body className={BODY}>
+                <p className="text-center text-[12px] leading-5 text-mac-muted">
+                  将永久删除 {removeDialog.paths.length} 个项目，文件不会进入废纸篓，也无法撤销
                 </p>
-                <ul className="mt-2.5 max-h-[120px] space-y-0.5 overflow-y-auto rounded-lg bg-black/[0.04] px-2.5 py-1.5 text-[12px] dark:bg-white/[0.05]">
+                <ul className="mt-2 max-h-[116px] space-y-0.5 overflow-y-auto rounded-[8px] bg-black/[0.04] px-2.5 py-1.5 text-[12px] dark:bg-white/[0.06]">
                   {removeDialog.paths.slice(0, 6).map((item) => (
                     <li key={item} className="truncate text-mac-text">
                       {basename(item) || item}
@@ -209,14 +213,12 @@ export function Dialogs() {
                   )}
                 </ul>
               </Modal.Body>
-
-              <Modal.Footer>
-                <Button variant="ghost" onPress={closeDialog}>
+              <Modal.Footer className={FOOTER}>
+                <Button className={SECONDARY} onPress={closeDialog}>
                   取消
                 </Button>
-                <span className="flex-1" />
                 <Button
-                  variant="danger-soft"
+                  className={DESTRUCTIVE}
                   onPress={() => {
                     const paths = [...removeDialog.paths];
                     closeDialog();
@@ -229,17 +231,8 @@ export function Dialogs() {
             </>
           ) : (
             <>
-              <Modal.Header>
-                <Modal.Icon className="bg-mac-blue/15 text-mac-blue">
-                  {dialog?.kind === "rename" ? (
-                    <Pencil className="size-5" />
-                  ) : dialog?.kind === "new-file" ? (
-                    <FilePlus className="size-5" />
-                  ) : (
-                    <FolderPlus className="size-5" />
-                  )}
-                </Modal.Icon>
-                <Modal.Heading>
+              <Modal.Header className={HEADER}>
+                <Modal.Heading className={HEADING}>
                   {dialog?.kind === "rename"
                     ? "重命名"
                     : dialog?.kind === "new-file"
@@ -248,23 +241,20 @@ export function Dialogs() {
                 </Modal.Heading>
               </Modal.Header>
 
-              <Modal.Body>
+              <Modal.Body className={BODY}>
                 <form
-                  className="flex flex-col gap-1.5"
                   onSubmit={(event) => {
                     event.preventDefault();
                     void submit();
                   }}
                 >
-                  <Label htmlFor="entry-name" className="text-[12px] font-medium text-mac-muted">
-                    名称
-                  </Label>
                   <Input
                     id="entry-name"
                     aria-label="名称"
                     autoFocus
                     fullWidth
                     variant="secondary"
+                    className={INPUT}
                     value={value}
                     onChange={(event) => setValue(event.target.value)}
                     onFocus={(event) => {
@@ -283,16 +273,17 @@ export function Dialogs() {
                 </form>
               </Modal.Body>
 
-              <Modal.Footer>
-                <Button variant="ghost" onPress={closeDialog}>
+              <Modal.Footer className={FOOTER}>
+                <Button className={SECONDARY} onPress={closeDialog}>
                   取消
                 </Button>
                 <Button
+                  className={PRIMARY}
                   isPending={busy}
                   isDisabled={!value.trim()}
                   onPress={() => void submit()}
                 >
-                  确定
+                  {dialog?.kind === "rename" ? "重命名" : "创建"}
                 </Button>
               </Modal.Footer>
             </>

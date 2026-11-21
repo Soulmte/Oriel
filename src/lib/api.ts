@@ -166,6 +166,10 @@ export const api = {
   newFile: (path: string, name: string, content = "") =>
     post<{ path: string }>("/fs/new-file", { path, name, content }),
 
+  /** Creates a real OOXML package (docx/xlsx/pptx), not an empty file. */
+  newOfficeFile: (path: string, name: string, template: "docx" | "xlsx" | "pptx") =>
+    post<{ path: string }>("/fs/new-office-file", { path, name, template }),
+
   openTerminal: (path: string) => post<{ ok: true }>("/fs/terminal", { path }),
 
   rename: (path: string, newName: string) =>

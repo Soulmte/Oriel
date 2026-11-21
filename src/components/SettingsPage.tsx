@@ -59,7 +59,7 @@ export function SettingsPage() {
     <div className="flex min-h-0 flex-1 bg-mac-surface">
       <nav
         aria-label="设置分类"
-        className="flex w-[188px] shrink-0 flex-col gap-0.5 border-r border-mac-line px-2.5 py-3"
+        className="flex w-[200px] shrink-0 flex-col gap-0.5 border-r border-mac-line bg-mac-chrome/40 px-2.5 py-3"
       >
         <button
           type="button"
@@ -91,7 +91,7 @@ export function SettingsPage() {
       </nav>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[980px] px-9 pb-16 pt-7">
+        <div className="mx-auto w-full max-w-[780px] px-8 pb-16 pt-6">
           {section === "appearance" && <SettingsAppearance />}
           {section === "browsing" && <SettingsBrowsing />}
           {section === "menu" && <SettingsContextMenu />}

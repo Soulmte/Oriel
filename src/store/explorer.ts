@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { toast } from "@heroui/react";
+
 import type {
   ConflictDto,
   ConflictPolicy,
@@ -57,7 +57,16 @@ import type { AppearancePrefs } from "../lib/appearance";
 
 export type DialogState =
   | { kind: "new-folder" }
-  | { kind: "new-file"; extension: string; label: string; content: string }
+  | {
+      kind: "new-file";
+      extension: string;
+      label: string;
+      content: string;
+      /** Suggested file name in the dialog, e.g. 新建 Word 文档. */
+      suggested?: string;
+      /** Office documents are built server-side from an OOXML template. */
+      template?: "docx" | "xlsx" | "pptx";
+    }
   | { kind: "rename"; entry: EntryDto }
   | { kind: "batch-rename"; paths: string[] }
   | { kind: "error"; message: string }
@@ -76,6 +85,12 @@ export type DialogState =
 export interface UndoAction {
   label: string;
   run: () => Promise<void>;
+}
+
+/** A short-lived floating notice. */
+export interface ToastMessage {
+  id: number;
+  message: string;
 }
 
 export interface ContextMenuState {
@@ -204,6 +219,7 @@ interface ExplorerState {
   beginDrag: () => void;
   endDrag: () => void;
   dialog: DialogState;
+  toasts: ToastMessage[];
   contextMenu: ContextMenuState | null;
   /** Which entries the context menu shows. */
   contextMenuPrefs: ContextMenuPrefs;
@@ -272,7 +288,11 @@ interface ExplorerState {
   closeDialog: () => void;
 
   createFolder: (name: string) => Promise<boolean>;
-  createFile: (name: string, content?: string) => Promise<boolean>;
+  createFile: (
+    name: string,
+    content?: string,
+    template?: "docx" | "xlsx" | "pptx",
+  ) => Promise<boolean>;
   openTerminal: () => Promise<void>;
   renameEntry: (name: string) => Promise<boolean>;
   /** Applies an already-previewed batch rename (paths + final names). */
@@ -283,6 +303,7 @@ interface ExplorerState {
 
   setContextMenu: (menu: ContextMenuState | null) => void;
   notify: (message: string) => void;
+  dismissToast: (id: number) => void;
 }
 
 const LAST_PATH_KEY = "oriel:last-path";
@@ -657,6 +678,7 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
   operationsOpen: false,
   undoStack: [],
   dialog: null,
+  toasts: [],
   contextMenu: null,
   contextMenuPrefs: readContextMenuPrefs(),
   shellVerbs: [],
@@ -1719,14 +1741,16 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
     }
   },
 
-  async createFile(name, content = "") {
+  async createFile(name, content = "", template) {
     const { path } = get();
     if (isArchivePath(path)) {
       get().notify("归档内容只读，请先解压到文件夹");
       return false;
     }
     try {
-      const created = await api.newFile(path, name, content);
+      const created = template
+        ? await api.newOfficeFile(path, name, template)
+        : await api.newFile(path, name, content);
       await get().reload();
       set({ selected: [created.path], anchor: created.path });
       get().notify("已新建文件");
@@ -2030,7 +2054,18 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
   },
 
   notify(message) {
-    toast(message, { timeout: 2200 });
+    const id = Date.now() + Math.random();
+    set((state) => ({
+      // Keep the stack short: three notices is already a crowd.
+      toasts: [...state.toasts.slice(-2), { id, message }],
+    }));
+    setTimeout(() => {
+      if (get().toasts.some((item) => item.id === id)) get().dismissToast(id);
+    }, 2400);
+  },
+
+  dismissToast(id) {
+    set((state) => ({ toasts: state.toasts.filter((item) => item.id !== id) }));
   },
 
   requestFolderSizes(paths) {

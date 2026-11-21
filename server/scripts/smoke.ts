@@ -196,6 +196,35 @@ try {
     );
   }
 
+  // Office documents must be real OOXML packages, not empty files.
+  for (const template of ["docx", "xlsx", "pptx"] as const) {
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/fs/new-office-file",
+      payload: { path: gamma, name: `blank.${template}`, template },
+    });
+    const file = path.join(gamma, `blank.${template}`);
+    const head = await fs.readFile(file).catch(() => Buffer.alloc(0));
+    const isZip = head.length > 4 && head[0] === 0x50 && head[1] === 0x4b;
+    const hasPackage = head.includes(Buffer.from("[Content_Types].xml"));
+    record(
+      `new ${template}`,
+      created.statusCode === 200 && isZip && hasPackage,
+      `${head.length} bytes`,
+    );
+  }
+
+  const wrongExt = await app.inject({
+    method: "POST",
+    url: "/api/fs/new-office-file",
+    payload: { path: gamma, name: "wrong.txt", template: "docx" },
+  });
+  record(
+    "new office rejects a mismatched extension",
+    wrongExt.statusCode === 400,
+    `HTTP ${wrongExt.statusCode} (expected 400)`,
+  );
+
   const remove = await app.inject({
     method: "POST",
     url: "/api/fs/delete",

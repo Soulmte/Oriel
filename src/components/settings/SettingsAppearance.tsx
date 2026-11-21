@@ -28,6 +28,7 @@ import { SFArrowCounterclockwise } from "sf-symbols-lib/dualtone";
 import { FontPicker } from "./FontPicker";
 import {
   SEGMENT_CLASS,
+  SEGMENT_TRACK,
   SettingsPageHeader,
   SettingsRow,
   SettingsSection,
@@ -68,7 +69,7 @@ export function SettingsAppearance() {
               if (typeof next === "string") setTheme(next);
             }}
             size="sm"
-            className="rounded-lg border border-mac-line bg-mac-chrome p-0.5"
+            className={SEGMENT_TRACK}
           >
             <ToggleButton id="light" className={SEGMENT_CLASS}>
               <SFSunMax size={14} />
@@ -136,7 +137,7 @@ export function SettingsAppearance() {
               }
             }}
             size="sm"
-            className="rounded-lg border border-mac-line bg-mac-chrome p-0.5"
+            className={SEGMENT_TRACK}
           >
             {SCALES.map((scale) => (
               <ToggleButton key={scale.value} id={scale.value} className={SEGMENT_CLASS}>
@@ -162,7 +163,7 @@ export function SettingsAppearance() {
               }
             }}
             size="sm"
-            className="rounded-lg border border-mac-line bg-mac-chrome p-0.5"
+            className={SEGMENT_TRACK}
           >
             {GRID_KEYS.map((key) => (
               <ToggleButton key={key} id={key} className={SEGMENT_CLASS}>
@@ -187,7 +188,7 @@ export function SettingsAppearance() {
               }
             }}
             size="sm"
-            className="rounded-lg border border-mac-line bg-mac-chrome p-0.5"
+            className={SEGMENT_TRACK}
           >
             {DENSITY_KEYS.map((key) => (
               <ToggleButton key={key} id={key} className={SEGMENT_CLASS}>
@@ -258,7 +259,7 @@ export function SettingsAppearance() {
               }
             }}
             size="sm"
-            className="rounded-lg border border-mac-line bg-mac-chrome p-0.5"
+            className={SEGMENT_TRACK}
           >
             <ToggleButton id="system" className={SEGMENT_CLASS}>
               系统默认
@@ -312,7 +313,7 @@ export function SettingsAppearance() {
               }
             }}
             size="sm"
-            className="rounded-lg border border-mac-line bg-mac-chrome p-0.5"
+            className={SEGMENT_TRACK}
           >
             {GLASS_KEYS.map((key) => (
               <ToggleButton key={key} id={key} className={SEGMENT_CLASS}>

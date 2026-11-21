@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Toast } from "@heroui/react";
 import { ThemeProvider } from "./ThemeProvider";
 
 /**
@@ -9,7 +8,6 @@ import { ThemeProvider } from "./ThemeProvider";
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider>
-      <Toast.Provider placement="bottom" width={360} />
       {children}
     </ThemeProvider>
   );

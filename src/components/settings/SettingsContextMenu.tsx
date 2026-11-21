@@ -31,6 +31,7 @@ import { isNativeShellAvailable, listShellVerbs } from "../../lib/shell";
 import type { ShellVerb } from "../../lib/shell";
 import {
   SEGMENT_CLASS,
+  SEGMENT_TRACK,
   SettingsPageHeader,
   SettingsRow,
   SettingsSection,
@@ -296,7 +297,7 @@ export function SettingsContextMenu() {
         )}
 
         {mode === "canvas" && (
-          <p className="mt-6 rounded-[8px] bg-black/[0.035] px-3 py-2 text-[12px] leading-5 text-mac-muted dark:bg-white/[0.05]">
+          <p className="mt-6 rounded-[10px] bg-mac-chrome px-3.5 py-2.5 text-[12px] leading-5 text-mac-muted">
             空白处菜单只有应用自己的命令，没有系统扩展项；系统菜单跟着选中的文件/文件夹走。
           </p>
         )}
@@ -310,7 +311,7 @@ export function SettingsContextMenu() {
               return (
                 <label
                   key={item.id}
-                  className="flex min-h-[34px] items-center justify-between gap-3 border-b border-mac-line/60 py-1 text-[12.5px]"
+                  className="flex min-h-[40px] items-center justify-between gap-3 border-b border-mac-line px-3.5 py-1 text-[12.5px]"
                 >
                   <span className={visible ? "text-mac-text" : "text-mac-muted/70"}>
                     {item.label}
@@ -330,13 +331,13 @@ export function SettingsContextMenu() {
           <SettingsSection
             title={`系统菜单项 · ${MODE_LABEL[mode]}（${verbLabels.length}）`}
           >
-            <p className="py-2 text-[12px] leading-5 text-mac-muted">
+            <p className="px-3.5 py-2 text-[12px] leading-5 text-mac-muted">
               {sample
                 ? `探测自 ${sample.path}，关掉的项不会出现在右键菜单里`
                 : "没有可用于探测的样本，切到另一种模式试试"}
             </p>
             {verbLabels.length === 0 ? (
-              <p className="pb-3 text-[12px] text-mac-muted/70">未检测到额外的系统菜单项</p>
+              <p className="px-3.5 pb-3 text-[12px] text-mac-muted/70">未检测到额外的系统菜单项</p>
             ) : (
               <div className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
                 {verbLabels.map((label) => {
@@ -344,7 +345,7 @@ export function SettingsContextMenu() {
                   return (
                     <label
                       key={label}
-                      className="flex min-h-[34px] items-center justify-between gap-3 border-b border-mac-line/60 py-1 text-[12.5px]"
+                      className="flex min-h-[40px] items-center justify-between gap-3 border-b border-mac-line px-3.5 py-1 text-[12.5px]"
                     >
                       <span className={visible ? "text-mac-text" : "text-mac-muted/70"}>
                         {label}
@@ -359,7 +360,7 @@ export function SettingsContextMenu() {
                 })}
               </div>
             )}
-            <div className="flex justify-end py-2">
+            <div className="flex justify-end px-3.5 py-2">
               <button
                 type="button"
                 onClick={resetContextMenuPrefs}
@@ -386,7 +387,7 @@ export function SettingsContextMenu() {
               if (next === "folder" || next === "file" || next === "canvas") setMode(next);
             }}
             size="sm"
-            className="rounded-lg border border-mac-line bg-mac-chrome p-0.5"
+            className={SEGMENT_TRACK}
           >
             <ToggleButton id="folder" className={SEGMENT_CLASS}>
               文件夹

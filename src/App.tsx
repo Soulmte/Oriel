@@ -14,6 +14,7 @@ import { StatusBar } from "./components/StatusBar";
 import { ContextMenuLayer } from "./components/ContextMenuLayer";
 import { Dialogs } from "./components/Dialogs";
 import { BatchRenameDialog } from "./components/BatchRenameDialog";
+import { ToastHost } from "./components/ToastHost";
 import { SettingsPage } from "./components/SettingsPage";
 import { RecycleBin } from "./components/RecycleBin";
 import { OperationsPanel } from "./components/OperationsPanel";
@@ -67,6 +68,7 @@ function ExplorerShell() {
       <ContextMenuLayer />
       <Dialogs />
       <BatchRenameDialog />
+      <ToastHost />
     </div>
   );
 }

@@ -464,7 +464,7 @@ export async function createFolder(parentPath: string, name: string): Promise<st
 export async function createFile(
   parentPath: string,
   name: string,
-  content = "",
+  content: string | Uint8Array = "",
 ): Promise<string> {
   const parentStat = await statOrThrow(parentPath);
   if (!parentStat.isDirectory()) {

@@ -43,27 +43,52 @@ import type { GroupKey } from "../lib/grouping";
 import { DENSITY_LABELS, GRID_SIZE_LABELS } from "../lib/appearance";
 
 /**
- * Common formats offered by 新建. Each entry renders with the same page+badge
- * icon the listing uses, so the menu previews exactly what it creates.
+ * What 新建 offers, in the order people actually reach for it: the documents
+ * you make every day first, code formats after. Office entries are real OOXML
+ * packages built by the service (an empty file would not open in Word).
  */
 const NEW_FILE_TYPES: Array<{
   extension: string;
   label: string;
+  /** File name suggested in the dialog. */
+  suggested: string;
   content: string;
-  hint?: string;
+  template?: "docx" | "xlsx" | "pptx";
 }> = [
-  { extension: "txt", label: "文本文档", content: "" },
-  { extension: "md", label: "Markdown", content: "# 标题\n\n" },
-  { extension: "ts", label: "TypeScript", content: "export {};\n" },
-  { extension: "js", label: "JavaScript", content: "" },
-  { extension: "tsx", label: "React 组件", content: "export function Component() {\n  return null;\n}\n" },
-  { extension: "json", label: "JSON", content: "{\n  \n}\n" },
-  { extension: "html", label: "HTML", content: "<!doctype html>\n<html lang=\"zh-CN\">\n  <head>\n    <meta charset=\"utf-8\" />\n    <title>Document</title>\n  </head>\n  <body></body>\n</html>\n" },
-  { extension: "css", label: "CSS", content: "" },
-  { extension: "py", label: "Python", content: "" },
-  { extension: "yml", label: "YAML", content: "" },
-  { extension: "sh", label: "Shell 脚本", content: "#!/usr/bin/env bash\n\n" },
-  { extension: "bat", label: "批处理", content: "@echo off\r\n" },
+  { extension: "txt", label: "文本文档", suggested: "新建文本文档", content: "" },
+  { extension: "md", label: "Markdown", suggested: "新建 Markdown", content: "# 标题\n\n" },
+  {
+    extension: "docx",
+    label: "Word 文档",
+    suggested: "新建 Word 文档",
+    content: "",
+    template: "docx",
+  },
+  {
+    extension: "xlsx",
+    label: "Excel 表格",
+    suggested: "新建 Excel 表格",
+    content: "",
+    template: "xlsx",
+  },
+  {
+    extension: "pptx",
+    label: "PowerPoint 演示文稿",
+    suggested: "新建演示文稿",
+    content: "",
+    template: "pptx",
+  },
+  { extension: "csv", label: "CSV 表格", suggested: "新建表格", content: "" },
+  { extension: "json", label: "JSON", suggested: "新建 JSON", content: "{\n  \n}\n" },
+  { extension: "ts", label: "TypeScript", suggested: "新建 TypeScript", content: "export {};\n" },
+  { extension: "js", label: "JavaScript", suggested: "新建 JavaScript", content: "" },
+  {
+    extension: "html",
+    label: "HTML",
+    suggested: "新建 HTML",
+    content: '<!doctype html>\n<html lang="zh-CN">\n  <head>\n    <meta charset="utf-8" />\n    <title>Document</title>\n  </head>\n  <body></body>\n</html>\n',
+  },
+  { extension: "py", label: "Python", suggested: "新建 Python", content: "" },
 ];
 
 const SORT_LABELS: Record<SortKey, string> = {
@@ -418,6 +443,8 @@ export function Toolbar() {
                   extension: type.extension,
                   label: type.label,
                   content: type.content,
+                  suggested: type.suggested,
+                  template: type.template,
                 });
               }}
             >
