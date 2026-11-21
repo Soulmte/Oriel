@@ -45,6 +45,8 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          # Re-running the job must replace the previous assets, not fail on them.
+          overwrite_files: true
           files: |
             oriel-server.zip
             src-tauri/target/release/bundle/msi/*.msi
