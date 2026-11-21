@@ -1,0 +1,151 @@
+/**
+ * End-to-end smoke test without binding a port: Fastify's inject() exercises
+ * the same routing, validation and filesystem code the app uses.
+ *
+ * Run: npm run smoke -w @oriel/server
+ */
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { buildApp } from "../src/app.js";
+
+interface Check {
+  name: string;
+  ok: boolean;
+  detail: string;
+}
+
+const checks: Check[] = [];
+
+function record(name: string, ok: boolean, detail: string): void {
+  checks.push({ name, ok, detail });
+  console.log(`${ok ? "PASS" : "FAIL"}  ${name}  ${detail}`);
+}
+
+const app = await buildApp({ logger: false });
+await app.ready();
+
+const workdir = await fs.mkdtemp(path.join(os.tmpdir(), "mac-explorer-smoke-"));
+
+try {
+  const health = await app.inject({ method: "GET", url: "/api/health" });
+  record("health", health.statusCode === 200 && health.json().ok === true, `HTTP ${health.statusCode}`);
+
+  const info = await app.inject({ method: "GET", url: "/api/system/info" });
+  const infoBody = info.json();
+  record("system/info", info.statusCode === 200 && !!infoBody.home, `platform=${infoBody.platform}`);
+
+  const drives = await app.inject({ method: "GET", url: "/api/drives" });
+  const driveList = drives.json();
+  record("drives", drives.statusCode === 200 && driveList.length > 0, `${driveList.length} drive(s)`);
+
+  const special = await app.inject({ method: "GET", url: "/api/special" });
+  record("special folders", special.statusCode === 200, `${special.json().length} folder(s)`);
+
+  const alpha = path.join(workdir, "alpha");
+  const beta = path.join(workdir, "beta");
+  await fs.mkdir(alpha);
+  await fs.mkdir(beta);
+  await fs.writeFile(path.join(alpha, "note.txt"), "hello from mac explorer", "utf8");
+
+  const list = await app.inject({
+    method: "GET",
+    url: `/api/fs/list?path=${encodeURIComponent(workdir)}`,
+  });
+  const entries = list.json().entries as Array<{ name: string; kind: string }>;
+  record(
+    "list directory",
+    list.statusCode === 200 && entries.some((entry) => entry.name === "alpha" && entry.kind === "directory"),
+    `${entries.length} entries`,
+  );
+
+  const search = await app.inject({
+    method: "GET",
+    url: `/api/fs/search?path=${encodeURIComponent(workdir)}&q=note`,
+  });
+  record(
+    "search",
+    search.statusCode === 200 && search.json().entries.length === 1,
+    `${search.json().entries.length} hit(s)`,
+  );
+
+  const rename = await app.inject({
+    method: "POST",
+    url: "/api/fs/rename",
+    payload: { path: path.join(alpha, "note.txt"), newName: "note-2.txt" },
+  });
+  record(
+    "rename",
+    rename.statusCode === 200 &&
+      (await fs.stat(path.join(alpha, "note-2.txt")).then(() => true).catch(() => false)),
+    `HTTP ${rename.statusCode}`,
+  );
+
+  const preview = await app.inject({
+    method: "GET",
+    url: `/api/fs/preview?path=${encodeURIComponent(path.join(alpha, "note-2.txt"))}`,
+  });
+  record(
+    "preview",
+    preview.statusCode === 200 && preview.json().content === "hello from mac explorer",
+    `${preview.json().size} bytes`,
+  );
+
+  const copy = await app.inject({
+    method: "POST",
+    url: "/api/fs/copy",
+    payload: { sources: [path.join(alpha, "note-2.txt")], target: beta },
+  });
+  record(
+    "copy",
+    copy.statusCode === 200 &&
+      (await fs.stat(path.join(beta, "note-2.txt")).then(() => true).catch(() => false)),
+    `HTTP ${copy.statusCode}`,
+  );
+
+  const move = await app.inject({
+    method: "POST",
+    url: "/api/fs/move",
+    payload: { sources: [path.join(beta, "note-2.txt")], target: alpha },
+  });
+  record(
+    "move conflict handling",
+    move.statusCode === 409,
+    `HTTP ${move.statusCode} (expected 409)`,
+  );
+
+  const mkdir = await app.inject({
+    method: "POST",
+    url: "/api/fs/mkdir",
+    payload: { path: workdir, name: "gamma" },
+  });
+  record("mkdir", mkdir.statusCode === 200, `HTTP ${mkdir.statusCode}`);
+
+  const remove = await app.inject({
+    method: "POST",
+    url: "/api/fs/delete",
+    payload: { paths: [alpha], permanent: true },
+  });
+  record(
+    "permanent delete",
+    remove.statusCode === 200 &&
+      !(await fs.stat(alpha).then(() => true).catch(() => false)),
+    `HTTP ${remove.statusCode}`,
+  );
+
+  const blocked = await app.inject({
+    method: "POST",
+    url: "/api/fs/delete",
+    payload: { paths: ["C:\\"], permanent: true },
+  });
+  record("root delete guard", blocked.statusCode === 403, `HTTP ${blocked.statusCode}`);
+} finally {
+  await fs.rm(workdir, { recursive: true, force: true });
+  await app.close();
+}
+
+const failed = checks.filter((check) => !check.ok);
+console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
+if (failed.length > 0) {
+  process.exitCode = 1;
+}

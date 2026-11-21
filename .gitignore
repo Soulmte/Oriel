@@ -1,0 +1,23 @@
+node_modules
+dist
+dist-ssr
+target
+tmp
+src-tauri/gen
+*.local
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# build output / tooling
+*.tsbuildinfo
+.vite
+coverage
+.idea
+.vscode
+*.zip
+*.7z
+# local scratch
+/tmp/

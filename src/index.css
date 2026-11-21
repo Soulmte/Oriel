@@ -1,0 +1,165 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+@theme {
+  --font-sans:
+    "SF Pro Text", "SF Pro Display", "Segoe UI Variable Text", "Segoe UI",
+    "PingFang SC", "Microsoft YaHei UI", system-ui, sans-serif;
+
+  --color-mac-bg: #f2f2f4;
+  --color-mac-surface: #ffffff;
+  --color-mac-chrome: #f6f6f8;
+  --color-mac-sidebar: #e8e9ed;
+  --color-mac-text: #1d1d1f;
+  --color-mac-muted: #78787f;
+  --color-mac-line: rgba(0, 0, 0, 0.08);
+  --color-mac-blue: #0a84ff;
+  --color-mac-blue-soft: rgba(10, 132, 255, 0.16);
+}
+
+.dark {
+  --color-mac-bg: #1b1b1d;
+  --color-mac-surface: #202022;
+  --color-mac-chrome: #2a2a2c;
+  --color-mac-sidebar: #202022;
+  --color-mac-text: #f2f2f4;
+  --color-mac-muted: #9a9aa1;
+  --color-mac-line: rgba(255, 255, 255, 0.09);
+  --color-mac-blue: #0a84ff;
+  --color-mac-blue-soft: rgba(10, 132, 255, 0.24);
+}
+
+/*
+ * Settings → 外观 → 毛玻璃：off makes the frosted surfaces solid (cheaper to
+ * composite on weak GPUs), strong blurs them harder.
+ */
+html[data-glass="off"] [class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html[data-glass="off"] [class*="bg-mac-chrome/"] {
+  background-color: var(--color-mac-chrome) !important;
+}
+html[data-glass="off"] [class*="bg-mac-sidebar/"] {
+  background-color: var(--color-mac-sidebar) !important;
+}
+html[data-glass="off"] [class*="bg-mac-surface/"] {
+  background-color: var(--color-mac-surface) !important;
+}
+html[data-glass="off"] [class*="bg-mac-bg/"] {
+  background-color: var(--color-mac-bg) !important;
+}
+html[data-glass="off"] [class*="bg-[#fbfbfd]/"] {
+  background-color: #fbfbfd !important;
+}
+html[data-glass="off"] [class*="bg-[#2c2c2e]/"] {
+  background-color: #2c2c2e !important;
+}
+html[data-glass="strong"] [class*="backdrop-blur-2xl"] {
+  backdrop-filter: blur(44px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(44px) saturate(180%) !important;
+}
+html[data-glass="strong"] [class*="backdrop-blur-xl"] {
+  backdrop-filter: blur(30px) saturate(170%) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(170%) !important;
+}
+
+/* Settings → 外观 → 动态效果：one switch kills every transition/animation. */
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: var(--color-mac-bg);
+    color: var(--color-mac-text);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    user-select: none;
+    overscroll-behavior: none;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-mac-blue) 30%, transparent);
+  }
+
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-clip: content-box;
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--color-mac-text) 20%, transparent);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--color-mac-text) 34%, transparent);
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  [data-tauri-drag-region] {
+    app-region: drag;
+    -webkit-app-region: drag;
+  }
+}
+
+@layer components {
+  .drag-region {
+    app-region: drag;
+    -webkit-app-region: drag;
+  }
+
+  .no-drag {
+    app-region: no-drag;
+    -webkit-app-region: no-drag;
+  }
+}
+
+@keyframes mac-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-toast-in {
+  animation: mac-toast-in 180ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@keyframes mac-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: mac-fade-in 140ms ease-out;
+}

@@ -1,0 +1,59 @@
+{
+  "name": "oriel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A Finder-style file manager for Windows — Tauri 2 + React 19 + local Fastify service",
+  "workspaces": [
+    "server",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c cyan,green \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "npm run dev -w @oriel/server",
+    "dev:web": "vite",
+    "dev:desktop": "wait-on http://127.0.0.1:8787/api/health tcp:5173 && tauri dev",
+    "dev:all": "concurrently -k -n server,web,app -c cyan,green,magenta \"npm:dev:server\" \"npm:dev:web\" \"npm:dev:desktop\"",
+    "build": "npm run build -w @oriel/server && vite build",
+    "build:web": "vite build",
+    "build:desktop": "vite build && tauri build",
+    "preview": "vite preview",
+    "typecheck": "npm run typecheck -w @oriel/server && tsc --noEmit",
+    "smoke": "npm run smoke -w @oriel/server",
+    "icon": "tauri icon src-tauri/app-icon.png"
+  },
+  "dependencies": {
+    "@heroui/react": "^3.2.7",
+    "@heroui/styles": "^3.2.7",
+    "@internationalized/date": "^3.12.4",
+    "@oriel/shared": "*",
+    "@react-aria/ssr": "^3.10.1",
+    "@react-aria/utils": "^3.34.1",
+    "@react-symbols/icons": "^1.4.1",
+    "@tauri-apps/api": "^2.12.4",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.73.0",
+    "react": "^19.3.1",
+    "react-aria": "^3.53.1",
+    "react-aria-components": "^1.22.1",
+    "react-dom": "^19.3.1",
+    "sf-symbols-lib": "^2.0.1",
+    "simple-icons": "^16.37.0",
+    "zustand": "^5.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
+    "@tauri-apps/cli": "^2.12.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "concurrently": "^10.0.7",
+    "tailwindcss": "^4.3.5",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.8",
+    "wait-on": "^9.5.1"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
