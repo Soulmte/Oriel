@@ -21,9 +21,11 @@ import {
   SFChevronRight,
   SFChevronUp,
   SFEllipsis,
+  SFDocumentBadgePlus,
   SFEye,
   SFFolderBadgePlus,
   SFGearshapeFill,
+  SFLink,
   SFLine3Horizontal,
   SFListBullet,
   SFSliderHorizontal3,
@@ -32,7 +34,7 @@ import {
   SFSquareGrid2x2,
   SFAppleTerminal,
 } from "sf-symbols-lib/dualtone";
-import { Loader2, FilePlus, Link2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { SortKey, ViewMode } from "@oriel/shared";
 import { useExplorer } from "../store/explorer";
 import { GROUP_LABELS } from "../lib/grouping";
@@ -373,7 +375,7 @@ export function Toolbar() {
               <span className="ml-auto text-[11px] text-muted">Ctrl+Shift+N</span>
             </Dropdown.Item>
             <Dropdown.Item id="file" textValue="新建文本文档">
-              <FilePlus className="size-3.5 shrink-0 text-muted" />
+              <SFDocumentBadgePlus size={14} className="shrink-0 text-muted" />
               <Label>新建文本文档</Label>
               <span className="ml-auto text-[11px] text-muted">.txt</span>
             </Dropdown.Item>
@@ -448,7 +450,7 @@ export function Toolbar() {
                 <Label>在此处打开终端</Label>
               </Dropdown.Item>
               <Dropdown.Item id="copy-path" textValue="复制当前路径" isDisabled={!path}>
-                <Link2 className="size-3.5 shrink-0 text-muted" />
+                <SFLink size={14} className="shrink-0 text-muted" />
                 <Label>复制当前路径</Label>
               </Dropdown.Item>
               <Separator />

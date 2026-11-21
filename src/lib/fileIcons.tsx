@@ -8,17 +8,21 @@ import {
   SFAppFill,
   SFArchiveboxFill,
   SFArrowDownCircleFill,
+  SFCubeFill,
   SFCupAndHeatWavesFill,
+  SFCylinderFill,
   SFCylinderSplit1x2Fill,
   SFDocumentFill,
   SFExternaldriveFill,
   SFFilmFill,
   SFFolderFill,
   SFGearshapeFill,
+  SFKeyFill,
   SFLink,
   SFMusicNote,
   SFPhotoFill,
   SFPhotoStackFill,
+  SFTablecellsFill,
   SFTextformat,
 } from "sf-symbols-lib/dualtone";
 import {
@@ -33,20 +37,26 @@ import {
   siDotnet,
   siElixir,
   siElm,
+  siBlender,
   siErlang,
   siFishshell,
   siGit,
   siGnubash,
+  siGradle,
+  siFortran,
   siGo,
   siHaskell,
   siHtml5,
   siJavascript,
   siJson,
+  siJulia,
   siJupyter,
   siKotlin,
   siLess,
   siLua,
   siMake,
+  siNim,
+  siNixos,
   siMysql,
   siPhp,
   siPython,
@@ -56,12 +66,16 @@ import {
   siSass,
   siScala,
   siShell,
+  siSolidity,
+  siTerraform,
   siSqlite,
   siSvelte,
   siSwift,
   siTailwindcss,
   siToml,
   siTypescript,
+  siWebassembly,
+  siZig,
   siVite,
   siVuedotjs,
   siXml,
@@ -113,11 +127,33 @@ function media(Icon: SFIcon, background: string): FileVisual {
   return { kind: "page", background, content: { kind: "symbol", Icon } };
 }
 
+/**
+ * Several brands (Next.js, GitHub, Unity…) are nearly black. On a dark window
+ * that logo disappears, so very dark colours are lifted towards grey while
+ * keeping the hue.
+ */
+function readable(color: string): string {
+  const match = /^#?([0-9a-f]{6})$/i.exec(color.replace("#", "#"));
+  if (!match) return color;
+  const value = Number.parseInt(match[1] as string, 16);
+  const r = (value >> 16) & 0xff;
+  const g = (value >> 8) & 0xff;
+  const b = value & 0xff;
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  if (luminance >= 56) return `#${match[1]}`;
+
+  const lift = (channel: number) =>
+    Math.round(channel + (255 - channel) * 0.45)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${lift(r)}${lift(g)}${lift(b)}`;
+}
+
 function brand(
   icon: { path: string; hex: string },
   color?: string,
 ): FileVisual {
-  return { kind: "brand", path: icon.path, color: color ?? `#${icon.hex}` };
+  return { kind: "brand", path: icon.path, color: readable(color ?? `#${icon.hex}`) };
 }
 
 /** A plain coloured symbol — used where no single brand fits (e.g. "SQL"). */
@@ -385,6 +421,255 @@ const extVisuals: Record<string, FileVisual> = {
   eot: media(SFTextformat, "#6f7278"),
 };
 
+/**
+ * Extra formats on top of the table above. Kept separate so the common
+ * extensions stay easy to scan, and so unknown ones can fall back to their own
+ * label instead of a blank page.
+ */
+const moreExtVisuals: Record<string, FileVisual> = {
+  // Documents
+  xps: doc("XPS", "#8a5cf6"),
+  oxps: doc("XPS", "#8a5cf6"),
+  ofd: doc("OFD", "#8a5cf6"),
+  hwp: doc("H", "#2b7cd3"),
+  hwpx: doc("H", "#2b7cd3"),
+  wps: doc("W", "#2b7cd3"),
+  et: doc("X", "#217346"),
+  dps: doc("P", "#d04423"),
+  mht: brand(siHtml5),
+  mhtml: brand(siHtml5),
+  eml: doc("M", "#4a76c4"),
+  msg: doc("M", "#4a76c4"),
+  one: doc("N", "#7a3fd4"),
+  vsd: doc("V", "#3955a3"),
+  vsdx: doc("V", "#3955a3"),
+  vsdxm: doc("V", "#3955a3"),
+  drawio: doc("D", "#f08705"),
+  odg: doc("D", "#3955a3"),
+  indd: doc("ID", "#ff3366"),
+  cbz: doc("CBZ", "#c9942f"),
+  cbr: doc("CBR", "#c9942f"),
+
+  // Images and 3D
+  jxl: media(SFPhotoFill, "#e0556b"),
+  heif: media(SFPhotoFill, "#e0556b"),
+  svgz: media(SFPhotoFill, "#e08a4a"),
+  icns: media(SFPhotoFill, "#e0556b"),
+  tga: media(SFPhotoFill, "#e0556b"),
+  exr: media(SFPhotoFill, "#e0556b"),
+  hdr: media(SFPhotoFill, "#e0556b"),
+  raw: media(SFPhotoStackFill, "#8a7f6f"),
+  cr2: media(SFPhotoStackFill, "#8a7f6f"),
+  cr3: media(SFPhotoStackFill, "#8a7f6f"),
+  nef: media(SFPhotoStackFill, "#8a7f6f"),
+  arw: media(SFPhotoStackFill, "#8a7f6f"),
+  dng: media(SFPhotoStackFill, "#8a7f6f"),
+  orf: media(SFPhotoStackFill, "#8a7f6f"),
+  rw2: media(SFPhotoStackFill, "#8a7f6f"),
+  kra: media(SFPhotoStackFill, "#7fbf5f"),
+  xcf: media(SFPhotoStackFill, "#6f9a87"),
+  blend: glyph(SFCubeFill, "#e87d0d"),
+  obj: glyph(SFCubeFill, "#7f8ad0"),
+  fbx: glyph(SFCubeFill, "#7f8ad0"),
+  stl: glyph(SFCubeFill, "#7f8ad0"),
+  glb: glyph(SFCubeFill, "#7f8ad0"),
+  gltf: glyph(SFCubeFill, "#7f8ad0"),
+  "3ds": glyph(SFCubeFill, "#7f8ad0"),
+  dae: glyph(SFCubeFill, "#7f8ad0"),
+  ma: glyph(SFCubeFill, "#59b7a8"),
+  mb: glyph(SFCubeFill, "#59b7a8"),
+
+  // Video / audio
+  mts: media(SFFilmFill, "#7c5cff"),
+  m2ts: media(SFFilmFill, "#7c5cff"),
+  vob: media(SFFilmFill, "#7c5cff"),
+  rmvb: media(SFFilmFill, "#7c5cff"),
+  "3gp": media(SFFilmFill, "#7c5cff"),
+  ogv: media(SFFilmFill, "#7c5cff"),
+  ts: media(SFFilmFill, "#7c5cff"),
+  m3u8: media(SFFilmFill, "#7c5cff"),
+  mid: media(SFMusicNote, "#e0447f"),
+  midi: media(SFMusicNote, "#e0447f"),
+  amr: media(SFMusicNote, "#e0447f"),
+  ape: media(SFMusicNote, "#e0447f"),
+  wv: media(SFMusicNote, "#e0447f"),
+  m4b: media(SFMusicNote, "#e0447f"),
+  aif: media(SFMusicNote, "#e0447f"),
+  aifc: media(SFMusicNote, "#e0447f"),
+  dsf: media(SFMusicNote, "#e0447f"),
+  dff: media(SFMusicNote, "#e0447f"),
+  cda: media(SFMusicNote, "#e0447f"),
+
+  // Archives and disk images
+  zipx: media(SFArchiveboxFill, "#c9942f"),
+  lz: media(SFArchiveboxFill, "#c9942f"),
+  lz4: media(SFArchiveboxFill, "#c9942f"),
+  lzma: media(SFArchiveboxFill, "#c9942f"),
+  arj: media(SFArchiveboxFill, "#c9942f"),
+  zpaq: media(SFArchiveboxFill, "#c9942f"),
+  xar: media(SFArchiveboxFill, "#c9942f"),
+  pkg: media(SFArchiveboxFill, "#c9942f"),
+  xapk: media(SFArchiveboxFill, "#c9942f"),
+  apks: media(SFArchiveboxFill, "#2e9d4f"),
+  vmdk: media(SFExternaldriveFill, "#6f7278"),
+  vdi: media(SFExternaldriveFill, "#6f7278"),
+  qcow2: media(SFExternaldriveFill, "#6f7278"),
+  wim: media(SFExternaldriveFill, "#6f7278"),
+  esd: media(SFExternaldriveFill, "#6f7278"),
+  swm: media(SFExternaldriveFill, "#6f7278"),
+
+  // Shells and shortcuts
+  appref: media(SFLink, "#2a9d9a"),
+  "appref-ms": media(SFLink, "#2a9d9a"),
+  desktop: media(SFLink, "#2a9d9a"),
+  website: media(SFLink, "#2a9d9a"),
+  webloc2: media(SFLink, "#2a9d9a"),
+
+  // Keys and certificates
+  pem: glyph(SFKeyFill, "#c9a227"),
+  crt: glyph(SFKeyFill, "#c9a227"),
+  cer: glyph(SFKeyFill, "#c9a227"),
+  der: glyph(SFKeyFill, "#c9a227"),
+  key: glyph(SFKeyFill, "#c9a227"),
+  pub: glyph(SFKeyFill, "#c9a227"),
+  ppk: glyph(SFKeyFill, "#c9a227"),
+  p12: glyph(SFKeyFill, "#c9a227"),
+  pfx: glyph(SFKeyFill, "#c9a227"),
+  gpg: glyph(SFKeyFill, "#c9a227"),
+  asc: glyph(SFKeyFill, "#c9a227"),
+  sig: glyph(SFKeyFill, "#c9a227"),
+  csr: glyph(SFKeyFill, "#c9a227"),
+
+  // Project and build files
+  plist: media(SFGearshapeFill, "#6d8086"),
+  reg: media(SFGearshapeFill, "#6d8086"),
+  inf: media(SFGearshapeFill, "#6d8086"),
+  manifest: media(SFGearshapeFill, "#6d8086"),
+  sln: doc("SLN", "#7a3fd4"),
+  csproj: brand(siDotnet),
+  vbproj: brand(siDotnet),
+  fsproj: brand(siDotnet),
+  vcxproj: brand(siCplusplus, "#2f7bbf"),
+  props: media(SFGearshapeFill, "#6d8086"),
+  targets: media(SFGearshapeFill, "#6d8086"),
+  nuspec: media(SFGearshapeFill, "#6d8086"),
+  resx: media(SFGearshapeFill, "#6d8086"),
+  xaml: doc("X", "#2f7bbf"),
+  qml: doc("Q", "#41cd52"),
+  kv: doc("KV", "#41cd52"),
+  env: doc("ENV", "#d4b93c"),
+  editorconfig: media(SFGearshapeFill, "#6d8086"),
+  tf: brand(siTerraform),
+  tfvars: brand(siTerraform),
+  hcl: brand(siTerraform),
+  nix: brand(siNixos),
+  dhall: doc("DH", "#8a5cf6"),
+  gradle: brand(siGradle),
+  groovy: doc("GRV", "#4298b8"),
+  sbt: doc("SBT", "#e74f4f"),
+  bzl: doc("BZL", "#43a047"),
+  bazel: doc("BZL", "#43a047"),
+  mk: brand(siMake),
+  ninja: doc("NJ", "#6f7278"),
+  cmake: brand(siCmake, "#2b6cb0"),
+
+  // Languages without a bundled logo
+  cshtml: doc("CS", "#68217a"),
+  razor: doc("RZ", "#68217a"),
+  vb: doc("VB", "#68217a"),
+  fs: brand(siDotnet),
+  fsx: brand(siDotnet),
+  jl: brand(siJulia),
+  nim: brand(siNim),
+  zig: brand(siZig),
+  odin: doc("ODIN", "#5b8fd6"),
+  sol: brand(siSolidity, "#8b8b8b"),
+  move: doc("MV", "#8a5cf6"),
+  cairo: doc("CZ", "#8a5cf6"),
+  v: doc("V", "#4a7dd6"),
+  sv: doc("SV", "#4a7dd6"),
+  svh: doc("SV", "#4a7dd6"),
+  tcl: doc("TCL", "#4a7dd6"),
+  awk: doc("AWK", "#5c8f5c"),
+  sed: doc("SED", "#5c8f5c"),
+  graphql: doc("GQL", "#e535ab"),
+  gql: doc("GQL", "#e535ab"),
+  proto: doc("PB", "#5a8fd0"),
+  thrift: doc("TH", "#e8581c"),
+  capnp: doc("CNP", "#c9a227"),
+  wasm: brand(siWebassembly, "#654ff0"),
+  wat: brand(siWebassembly, "#654ff0"),
+  m: doc("M", "#8a8d93"),
+  mm: doc("MM", "#8a8d93"),
+  pas: doc("PAS", "#3f7ec4"),
+  dpr: doc("DPR", "#3f7ec4"),
+  f90: brand(siFortran, "#734f96"),
+  f95: brand(siFortran, "#734f96"),
+  for: brand(siFortran, "#734f96"),
+  cob: doc("COB", "#005ca5"),
+  cbl: doc("CBL", "#005ca5"),
+  pl: doc("PL", "#3a6ea5"),
+  pm: doc("PM", "#3a6ea5"),
+  coffee: doc("CF", "#6f4e37"),
+  cr: doc("CR", "#4a8f5c"),
+  purs: doc("PS", "#1c1c1c"),
+  gleam: doc("GL", "#ffaff3"),
+  applescript: doc("AS", "#8a8d93"),
+  scpt: doc("AS", "#8a8d93"),
+  ahk: doc("AHK", "#334455"),
+  nsi: doc("NSI", "#2f6f9a"),
+  nsh: doc("NSH", "#2f6f9a"),
+  astro2: doc("A", "#ff5d01"),
+
+  // Data and notebooks
+  rmd: brand(siR),
+  qmd: doc("QMD", "#4a7dd6"),
+  feather: doc("FT", "#e08a4a"),
+  orc: doc("ORC", "#217346"),
+  h5: doc("H5", "#5aa9c9"),
+  hdf5: doc("H5", "#5aa9c9"),
+  nc: doc("NC", "#5aa9c9"),
+  mat: glyph(SFTablecellsFill, "#c9803a"),
+  sav: glyph(SFTablecellsFill, "#c9803a"),
+  dta: glyph(SFTablecellsFill, "#c9803a"),
+  tsv: glyph(SFTablecellsFill, "#217346"),
+  arrow: doc("AR", "#5aa9c9"),
+  sas7bdat: doc("SAS", "#1f6fb2"),
+
+  // Fonts, subtitles, geo
+  ttc: media(SFTextformat, "#6f7278"),
+  pfb: media(SFTextformat, "#6f7278"),
+  pfm: media(SFTextformat, "#6f7278"),
+  fon: media(SFTextformat, "#6f7278"),
+  sub: doc("SUB", "#6f7278"),
+  ssa: doc("SSA", "#6f7278"),
+  ttml: doc("TTML", "#6f7278"),
+  sbv: doc("SBV", "#6f7278"),
+  ics: doc("ICS", "#c94f4f"),
+  vcf: doc("VCF", "#4a7dd6"),
+  gpx: doc("GPX", "#4a8f5c"),
+  kml: doc("KML", "#4a8f5c"),
+  kmz: doc("KMZ", "#4a8f5c"),
+};
+
+const FALLBACK_BADGES = [
+  "#6f7278",
+  "#5d7f9e",
+  "#7b6f9e",
+  "#9e7a6f",
+  "#5f8f7d",
+  "#9e6f7a",
+];
+
+/** Every format gets a badge: unknown extensions show their own letters. */
+function fallbackVisual(ext: string): FileVisual {
+  if (!ext) return documentVisual;
+  const label = ext.slice(0, 3).toUpperCase();
+  let hash = 0;
+  for (const char of ext) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return doc(label, FALLBACK_BADGES[hash % FALLBACK_BADGES.length] as string);
+}
+
 function visualFor(entry: EntryDto): FileVisual {
   const lower = entry.name.toLowerCase();
   const named = nameVisuals[lower];
@@ -399,7 +684,7 @@ function visualFor(entry: EntryDto): FileVisual {
   if (lower.startsWith("tauri.conf.")) return nameVisuals["tauri.conf.json"] ?? documentVisual;
 
   if (!entry.ext) return documentVisual;
-  return extVisuals[entry.ext] ?? documentVisual;
+  return extVisuals[entry.ext] ?? moreExtVisuals[entry.ext] ?? fallbackVisual(entry.ext);
 }
 
 /**
@@ -505,9 +790,9 @@ function PageIcon({
                 visual.content.text.length === 1
                   ? badge * 0.58
                   : visual.content.text.length === 2
-                    ? badge * 0.46
-                    : badge * 0.36,
-              letterSpacing: "-0.02em",
+                    ? badge * 0.44
+                    : badge * 0.31,
+              letterSpacing: visual.content.text.length >= 3 ? "-0.04em" : "-0.02em",
             }}
           >
             {visual.content.text}

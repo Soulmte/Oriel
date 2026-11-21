@@ -18,7 +18,7 @@ Node/TypeScript REST 服务提供，桌面外壳使用 Tauri 2。
 | --- | --- |
 | 桌面外壳 | Tauri 2（无边框窗口 + 自绘红绿灯；Rust 侧通过 `windows` crate 调 Shell COM） |
 | 前端 | React 19、TypeScript、Vite 7、Tailwind CSS 4、HeroUI v3、zustand |
-| 文件图标 | 文档用 Office 风格白页 + 角标；代码用 `simple-icons` 的语言官方 logo；快捷方式与可执行文件走 Windows Shell 提取真实图标 |
+| 文件图标 | 文档用 Office 风格白页 + 角标；代码用 `simple-icons` 的语言官方 logo；快捷方式与可执行文件走 Windows Shell 提取真实图标；覆盖 **397 种扩展名 + 25 个特殊文件名**，未知扩展名回退成「扩展名角标」而不是空白页 |
 | 后端 | Node 22、Fastify 5、`trash`（回收站） |
 | 契约 | `packages/shared` 中的共享 DTO / 常量 |
 
