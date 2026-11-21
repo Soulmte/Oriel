@@ -262,11 +262,15 @@ export const api = {
   retryTask: (id: string) => post<TaskProgressDto>(`/fs/tasks/${id}/retry`, {}),
 
   /** Latest GitHub release (unconfigured when the repo is not set). */
-  updateCheck: () => request<UpdateInfoDto>("/app/update"),
+  updateCheck: (refresh = false) =>
+    request<UpdateInfoDto>(`/app/update${refresh ? "?refresh=1" : ""}`),
 
   /** Downloads a release asset into the temp folder as a tracked task. */
-  downloadUpdate: (url: string, name: string) =>
-    post<TaskProgressDto>("/app/update/download", { url, name }),
+  downloadUpdate: (urls: string | string[], name: string) =>
+    post<TaskProgressDto>("/app/update/download", {
+      urls: Array.isArray(urls) ? urls : [urls],
+      name,
+    }),
 
   /** Single-shot progress read; used as a fallback when SSE drops an update. */
   task: (id: string) => request<TaskProgressDto>(`/fs/tasks/${id}`),
@@ -283,4 +287,27 @@ export function errorMessage(error: unknown): string {
   if (error instanceof ApiRequestError) return error.message;
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+/**
+ * Waits until the bundled service answers. The installer starts Node from Rust
+ * while the webview paints immediately, so the first health probe can arrive a
+ * few seconds early; a single probe used to leave the app stuck on
+ * “服务未连接” for the rest of the session.
+ */
+export async function waitForService(timeoutMs = 30_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  let attempt = 0;
+  while (Date.now() < deadline) {
+    try {
+      await api.health();
+      return true;
+    } catch {
+      // Back off gently: 250 ms, 500 ms, 1 s, then every second.
+      const delay = Math.min(1000, 250 * 2 ** attempt);
+      attempt += 1;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  return false;
 }

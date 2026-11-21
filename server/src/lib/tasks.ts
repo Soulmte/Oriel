@@ -525,12 +525,15 @@ const UPDATE_DIRECTORY = path.join(os.tmpdir(), "oriel-updates");
 
 /**
  * Downloads a release asset into the temp folder with byte-level progress.
- * Reuses the task plumbing so the operations center shows it like any other
- * job (cancel included).
+ *
+ * Several URLs may be supplied (CDN, Gitee mirror, GitHub). They are tried in
+ * order until one succeeds, so a blocked GitHub asset does not leave the user
+ * with a failed download while the mirror is reachable.
  */
-export function createDownload(url: string, name: string): TaskProgress {
+export function createDownload(urls: string[], name: string): TaskProgress {
   const safeName = name.replace(/[\\/:*?"<>|]/g, "_") || "update-download";
   const destination = path.join(UPDATE_DIRECTORY, safeName);
+  const candidates = urls.map((url) => url.trim()).filter(Boolean);
 
   const task: TaskProgress = {
     id: randomUUID(),
@@ -600,39 +603,63 @@ export function createDownload(url: string, name: string): TaskProgress {
             }
             reject(error);
           });
-          request.setTimeout(30_000, () => request.destroy(new Error("连接超时")));
+          request.setTimeout(12_000, () => request.destroy(new Error("连接超时")));
         });
 
-      const { stream, total } = await openStream(url);
-      if (total > 0) {
-        task.bytesTotal = total;
-        publish(task);
+      let lastError: unknown = null;
+
+      for (const target of candidates) {
+        if (cancelled.has(task.id)) throw new CancelledError();
+
+        try {
+          const { stream, total } = await openStream(target);
+          task.bytesDone = 0;
+          task.bytesTotal = total > 0 ? total : 0;
+          publish(task);
+
+          stream.on("data", (chunk: Buffer) => {
+            // Throwing from an event handler would take the whole service down;
+            // a destroyed stream surfaces the cancellation through `finish`.
+            if (cancelled.has(task.id)) {
+              stream.destroy(new CancelledError());
+              return;
+            }
+            tracker.add(chunk.length);
+          });
+
+          await new Promise<void>((resolve, reject) => {
+            const file = plainWriteStream(destination, { flags: "w" });
+            let settled = false;
+            const finish = (error?: unknown) => {
+              if (settled) return;
+              settled = true;
+              if (error) {
+                stream.destroy();
+                file.destroy();
+                reject(error);
+              } else {
+                resolve();
+              }
+            };
+            stream.on("error", finish);
+            file.on("error", finish);
+            file.on("finish", () => finish());
+            stream.pipe(file);
+          });
+
+          lastError = null;
+          break;
+        } catch (error) {
+          if (error instanceof CancelledError || cancelled.has(task.id)) {
+            throw new CancelledError();
+          }
+          lastError = error;
+          await plainFs.rm(destination, { force: true }).catch(() => undefined);
+        }
       }
 
-      stream.on("data", (chunk: Buffer) => {
-        tracker.add(chunk.length);
-        tracker.check();
-      });
-
-      await new Promise<void>((resolve, reject) => {
-        const file = plainWriteStream(destination, { flags: "w" });
-        let settled = false;
-        const finish = (error?: unknown) => {
-          if (settled) return;
-          settled = true;
-          if (error) {
-            stream.destroy();
-            file.destroy();
-            reject(error);
-          } else {
-            resolve();
-          }
-        };
-        stream.on("error", finish);
-        file.on("error", finish);
-        file.on("finish", () => finish());
-        stream.pipe(file);
-      });
+      if (lastError) throw lastError;
+      if (candidates.length === 0) throw new Error("没有可用的下载地址");
 
       task.created = [destination];
       task.done = 1;

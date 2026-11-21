@@ -29,6 +29,7 @@ import {
   SFLink,
   SFLine3Horizontal,
   SFListBullet,
+  SFMagnifyingglass,
   SFSliderHorizontal3,
   SFPlus,
   SFSidebarRight,
@@ -436,13 +437,11 @@ export function Toolbar() {
             aria-label={`搜索范围：${SEARCH_SCOPE_LABELS[searchScope]}`}
           >
             {searchScope === "folder" ? (
-              <SFFolderBadgePlus size={14} />
+              <SFMagnifyingglass size={14} />
             ) : (
               <SFExternaldriveFill size={14} />
             )}
-            {showLabels && (
-              <span className="whitespace-nowrap">{SEARCH_SCOPE_LABELS[searchScope]}</span>
-            )}
+            <span className="whitespace-nowrap">{SEARCH_SCOPE_LABELS[searchScope]}</span>
             <SFChevronDown size={9} className="opacity-55" />
           </Button>
           <Dropdown.Popover placement="bottom end" className="min-w-[184px]">
@@ -525,6 +524,7 @@ export function Toolbar() {
           <SearchField.Group className="h-7 w-full rounded-[7px]">
             <SearchField.SearchIcon className="size-3.5" />
             <SearchField.Input
+              data-search-input
               placeholder="搜索"
               className="w-full text-[12.5px] placeholder:text-mac-muted"
               onKeyDown={(event) => {

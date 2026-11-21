@@ -4,7 +4,7 @@
  */
 
 export const APP_NAME = "Oriel";
-export const APP_VERSION = "0.1.1";
+export const APP_VERSION = "0.1.2";
 export const DEFAULT_API_PORT = 8787;
 export const DEFAULT_API_BASE_URL = `http://127.0.0.1:${DEFAULT_API_PORT}`;
 
@@ -181,7 +181,12 @@ export interface RecycleListResponse {
 /** Result of the in-app update check against GitHub releases. */
 export interface UpdateAssetDto {
   name: string;
+  /** Preferred download URL (CDN, then GitHub, then Gitee). */
   url: string;
+  /** Gitee mirror for the same file, when the release is mirrored. */
+  mirrorUrl?: string | null;
+  /** Original GitHub asset, used as the last fallback. */
+  sourceUrl?: string | null;
   size: number;
 }
 
@@ -216,7 +221,7 @@ export interface HealthResponse {
 
 export const SEARCH_MIN_QUERY_LENGTH = 1;
 /** Results a single search may return before it stops looking. */
-export const SEARCH_RESULT_LIMIT = 300;
+export const SEARCH_RESULT_LIMIT = 500;
 /** Wall-clock budget for one search; a whole-disk query cannot run forever. */
 export const SEARCH_BUDGET_MS = 10_000;
 export const PREVIEW_BYTE_LIMIT = 512 * 1024;

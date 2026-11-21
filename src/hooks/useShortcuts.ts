@@ -50,6 +50,14 @@ export function useShortcuts() {
         return;
       }
 
+      if (ctrl && key === "f") {
+        event.preventDefault();
+        const input = document.querySelector<HTMLInputElement>("[data-search-input]");
+        input?.focus();
+        input?.select();
+        return;
+      }
+
       if (ctrl && event.key === "1") {
         event.preventDefault();
         state.setView("grid");

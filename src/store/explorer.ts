@@ -17,7 +17,7 @@ import type {
   TransferKind,
   ViewMode,
 } from "@oriel/shared";
-import { api, errorMessage } from "../lib/api";
+import { api, ApiRequestError, errorMessage, waitForService } from "../lib/api";
 import {
   invokeShellVerb,
   isNativeShellAvailable,
@@ -32,6 +32,7 @@ import {
 import type { ContextMenuPrefs } from "../lib/contextMenuPrefs";
 import { readCachedIcons, pruneCachedIcons, writeCachedIcons } from "../lib/iconCache";
 import type { CachedShellIcon } from "../lib/iconCache";
+import { restartService, takeStartupPaths } from "../lib/system";
 import {
   basename,
   parentPath,
@@ -121,6 +122,12 @@ interface ExplorerState {
   entries: EntryDto[];
   loading: boolean;
   error: string | null;
+  /**
+   * Tri-state service reachability: `null` while the first probe is running,
+   * `true` once the REST service answers, `false` when it cannot be reached.
+   * A listing error no longer implies a dead service.
+   */
+  online: boolean | null;
 
   history: string[];
   historyIndex: number;
@@ -147,7 +154,7 @@ interface ExplorerState {
   /** Compress the current selection into a zip next to it. */
   compressSelection: () => Promise<void>;
   /** Download a release asset and track it in the operations center. */
-  downloadUpdate: (url: string, name: string) => Promise<string | null>;
+  downloadUpdate: (urls: string[], name: string) => Promise<string | null>;
   showHidden: boolean;
   startLocation: StartLocation;
   /** Finder-style preview panel on the right edge. */
@@ -311,16 +318,81 @@ interface ExplorerState {
   dismissToast: (id: number) => void;
 }
 
+/**
+ * Keeps `online` honest after boot and brings the service back if it died.
+ * Two consecutive misses trigger one restart; the page then re-initialises
+ * itself instead of staying on “服务未连接” until the next launch.
+ */
+function startHealthWatch(
+  set: (partial: Partial<ExplorerState>) => void,
+  get: () => ExplorerState,
+) {
+  if (healthTimer) return;
+  let failures = 0;
+  let restarting = false;
+
+  healthTimer = setInterval(() => {
+    void (async () => {
+      try {
+        await api.health();
+        failures = 0;
+        if (get().online !== true) set({ online: true });
+        // The service answered but the first boot never finished (for example
+        // the process came up after the 30 s window): finish initialisation.
+        if (!get().path) {
+          initStarted = false;
+          void get().init();
+        }
+      } catch {
+        failures += 1;
+        if (get().online !== false) set({ online: false });
+
+        if (failures >= 2 && !restarting) {
+          restarting = true;
+          try {
+            await restartService();
+            if (await waitForService(10_000)) {
+              failures = 0;
+              set({ online: true, error: null });
+              if (!get().path) {
+                initStarted = false;
+                void get().init();
+              }
+            }
+          } catch {
+            // Browser build or a locked-down shell: keep reporting offline.
+          } finally {
+            restarting = false;
+          }
+        }
+      }
+    })();
+  }, 6000);
+}
+
 const LAST_PATH_KEY = "oriel:last-path";
 
 function readSearchScope(): SearchScope {
   try {
     const raw = localStorage.getItem(PREF.searchScope);
-    if (raw === "disk" || raw === "all" || raw === "folder") return raw;
+    if (raw === "disk" || raw === "all") return raw;
+    if (raw === "folder") {
+      // Earlier builds defaulted to “当前文件夹”, so a stored `folder` was
+      // almost never a deliberate choice. Widen it once, then respect the
+      // user's pick from this version onwards.
+      if (!localStorage.getItem(PREF.searchScopeMigrated)) {
+        localStorage.setItem(PREF.searchScope, "disk");
+        localStorage.setItem(PREF.searchScopeMigrated, "1");
+        return "disk";
+      }
+      return "folder";
+    }
   } catch {
-    // Fall through to the default.
+    // Private windows reject storage; fall through to the default.
   }
-  return "folder";
+  // A file manager that only looks inside the open folder repeats Explorer's
+  // worst habit; the disk-wide scope is the useful default.
+  return "disk";
 }
 
 /** In-memory shell icon entries kept per session before evicting the oldest. */
@@ -347,8 +419,18 @@ const SHELL_ICON_EXTENSIONS = new Set([
   "exe",
   "msi",
   "msix",
-  "ico",
+  "msixbundle",
+  "appx",
   "appref-ms",
+  "bat",
+  "cmd",
+  "com",
+  "scr",
+  "ps1",
+  "vbs",
+  "jar",
+  "dll",
+  "ico",
   "doc",
   "docx",
   "docm",
@@ -385,6 +467,8 @@ const PREF = {
   startLocation: "oriel:pref-start-location",
   preview: "oriel:pref-preview",
   searchScope: "oriel:pref-search-scope",
+  /** Marks the one-time widening from the old folder-only default. */
+  searchScopeMigrated: "oriel:pref-search-scope-v2",
   group: "oriel:pref-group",
 } as const;
 
@@ -424,6 +508,8 @@ let searchTimer: ReturnType<typeof setTimeout> | undefined;
 let searchSource: EventSource | null = null;
 /** Monotonic token: only the newest search may write its results. */
 let searchSeq = 0;
+/** Periodic reachability probe; started once by `init`. */
+let healthTimer: ReturnType<typeof setInterval> | undefined;
 
 function closeSearchStream(): void {
   searchSource?.close();
@@ -655,6 +741,7 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
   entries: [],
   loading: false,
   error: null,
+  online: null,
 
   history: [],
   historyIndex: -1,
@@ -706,6 +793,28 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
     set({ loading: true, error: null });
     void pruneCachedIcons();
 
+    // The installer boots the Node service from Rust while the webview paints,
+    // so the very first request can arrive before the port is open. Waiting
+    // here is what keeps a fresh install from showing “服务未连接” forever.
+    if (!(await waitForService(30_000))) {
+      initStarted = false;
+      set({
+        ready: true,
+        loading: false,
+        online: false,
+        error: "本地服务启动失败，正在重试…",
+      });
+      setTimeout(() => {
+        initStarted = false;
+        void get().init();
+      }, 4000);
+      startHealthWatch(set, get);
+      return;
+    }
+
+    set({ online: true });
+    startHealthWatch(set, get);
+
     try {
       const [system, specials, drives] = await Promise.all([
         api.systemInfo(),
@@ -713,7 +822,7 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
         api.drives(),
       ]);
 
-      set({ system, specials, drives, ready: true });
+      set({ system, specials, drives, ready: true, online: true });
 
       const home = specials.find((folder) => folder.id === "home")?.path ?? system.home;
       const saved = localStorage.getItem(LAST_PATH_KEY);
@@ -724,7 +833,11 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
             ? saved
             : home;
 
-      await get().navigate(target, { history: "replace" });
+      // A folder opened from Explorer (or “用 Oriel 打开”) wins over history.
+      const [startup] = await takeStartupPaths();
+      const initial = startup && startup.trim() ? startup : target;
+
+      await get().navigate(initial, { history: "replace" });
       if (!get().path) {
         await get().navigate(home, { history: "replace" });
       }
@@ -802,7 +915,14 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
       const firstFile = response.entries.find((entry) => entry.kind === "file");
       if (firstFile) warmShellVerbs(firstFile);
     } catch (error) {
-      if (seq === navSeq) set({ loading: false, error: errorMessage(error) });
+      if (seq !== navSeq) return;
+      const offline =
+        error instanceof ApiRequestError && error.code === "NETWORK_ERROR";
+      set({
+        loading: false,
+        error: errorMessage(error),
+        ...(offline ? { online: false } : {}),
+      });
     }
   },
 
@@ -1159,9 +1279,9 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
     }
   },
 
-  async downloadUpdate(url, name) {
+  async downloadUpdate(urls, name) {
     try {
-      const task = await api.downloadUpdate(url, name);
+      const task = await api.downloadUpdate(urls, name);
       set({
         tasks: { ...get().tasks, [task.id]: task },
         activeTaskId: task.id,
@@ -1220,6 +1340,7 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
     set({ searchScope: scope });
     try {
       localStorage.setItem(PREF.searchScope, scope);
+      localStorage.setItem(PREF.searchScopeMigrated, "1");
     } catch {
       // Remembering the scope is best effort.
     }

@@ -273,7 +273,7 @@ function Convert-IconToBase64($icon) {
 }
 
 # Types whose "system default" icon is meaningful even without the file itself.
-$appExtensions = @('.exe', '.lnk', '.url', '.msi', '.msix', '.com', '.bat', '.cmd', '.scr', '.appref-ms')
+$appExtensions = @('.exe', '.lnk', '.url', '.msi', '.msix', '.msixbundle', '.appx', '.com', '.bat', '.cmd', '.scr', '.ps1', '.vbs', '.jar', '.dll', '.appref-ms')
 
 function Get-TypeIcon([string]$target) {
     $extension = [System.IO.Path]::GetExtension($target)

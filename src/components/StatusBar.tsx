@@ -18,6 +18,7 @@ export function StatusBar() {
   const path = useExplorer((state) => state.path);
   const platform = useExplorer((state) => state.system?.platform ?? "win32");
   const error = useExplorer((state) => state.error);
+  const online = useExplorer((state) => state.online);
   const folderSizes = useExplorer((state) => state.folderSizes);
   const tasks = useExplorer((state) => state.tasks);
   const toggleOperations = useExplorer((state) => state.toggleOperations);
@@ -154,15 +155,20 @@ export function StatusBar() {
       )}
 
       <span className="ml-auto flex items-center gap-2">
-        {error ? (
+        {online === null ? (
           <>
-            <span className="size-1.5 rounded-full bg-[#ff453a]" />
-            <span>服务未连接</span>
+            <span className="size-1.5 animate-pulse rounded-full bg-[#ff9f0a]" />
+            <span>正在连接本地服务…</span>
           </>
-        ) : (
+        ) : online ? (
           <>
             <span className="size-1.5 rounded-full bg-[#34c759]" />
             <span>本地服务</span>
+          </>
+        ) : (
+          <>
+            <span className="size-1.5 rounded-full bg-[#ff453a]" />
+            <span title={error ?? undefined}>服务未连接</span>
           </>
         )}
         {currentDrive && currentDrive.total > 0 && (

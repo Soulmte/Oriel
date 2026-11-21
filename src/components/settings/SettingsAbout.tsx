@@ -6,6 +6,7 @@ import type { UpdateInfoDto } from "@oriel/shared";
 import { useExplorer } from "../../store/explorer";
 import { useAppTheme } from "../ThemeProvider";
 import { api, errorMessage } from "../../lib/api";
+import { installUpdate } from "../../lib/system";
 import { formatBytes } from "../../lib/format";
 import { Markdown } from "../../lib/markdown";
 import { SettingsPageHeader, SettingsRow, SettingsSection } from "./shared";
@@ -35,15 +36,17 @@ export function SettingsAbout() {
   const primaryAsset = useMemo(() => {
     if (!update?.assets?.length) return null;
     return (
-      update.assets.find((asset) => /\.(exe|msi|msix)$/i.test(asset.name)) ??
+      update.assets.find((asset) => /setup.*\.exe$/i.test(asset.name)) ??
+      update.assets.find((asset) => /\.exe$/i.test(asset.name)) ??
+      update.assets.find((asset) => /\.(msi|msix)$/i.test(asset.name)) ??
       update.assets[0]
     );
   }, [update]);
 
-  const check = async () => {
+  const check = async (refresh = false) => {
     setChecking(true);
     try {
-      setUpdate(await api.updateCheck());
+      setUpdate(await api.updateCheck(refresh));
     } catch (error) {
       notify(errorMessage(error));
     } finally {
@@ -94,7 +97,7 @@ export function SettingsAbout() {
               size="sm"
               variant="secondary"
               isPending={checking}
-              onPress={() => void check()}
+              onPress={() => void check(true)}
             >
               <SFArrowCounterclockwise size={14} />
               重新检查
@@ -142,7 +145,12 @@ export function SettingsAbout() {
                       download?.status === "running" || download?.status === "queued"
                     }
                     onPress={async () => {
-                      const id = await downloadUpdate(primaryAsset.url, primaryAsset.name);
+                      const urls = [
+                        primaryAsset.url,
+                        primaryAsset.mirrorUrl,
+                        primaryAsset.sourceUrl,
+                      ].filter((value): value is string => Boolean(value));
+                      const id = await downloadUpdate(urls, primaryAsset.name);
                       if (id) setDownloadId(id);
                     }}
                   >
@@ -150,12 +158,29 @@ export function SettingsAbout() {
                     {primaryAsset.size > 0 ? `（${formatBytes(primaryAsset.size)}）` : ""}
                   </Button>
                   {download?.status === "done" && download.created[0] && (
-                    <Button
-                      size="sm"
-                      onPress={() => void api.openPath(download.created[0] as string)}
-                    >
-                      打开安装包
-                    </Button>
+                    <>
+                      {/\.(exe|msi)$/i.test(download.created[0]) && (
+                        <Button
+                          size="sm"
+                          onPress={async () => {
+                            try {
+                              await installUpdate(download.created[0] as string);
+                            } catch (error) {
+                              notify(errorMessage(error));
+                            }
+                          }}
+                        >
+                          立即安装并退出
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onPress={() => void api.openPath(download.created[0] as string)}
+                      >
+                        打开安装包
+                      </Button>
+                    </>
                   )}
                   {download?.status === "failed" && (
                     <span className="text-[11.5px] text-[#ff453a]">
@@ -191,6 +216,12 @@ export function SettingsAbout() {
                       {download.status === "done" && <span>下载完成</span>}
                     </div>
                   </div>
+                )}
+
+                {download?.status === "done" && (
+                  <p className="text-[11px] leading-4 text-mac-muted">
+                    「立即安装」会先退出 Oriel 再启动安装程序；安装完成后请重新打开。
+                  </p>
                 )}
               </div>
             )}

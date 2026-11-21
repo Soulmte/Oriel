@@ -4,9 +4,10 @@ import { useExplorer } from "../../store/explorer";
 import { isNativeShellAvailable } from "../../lib/shell";
 import {
   openDefaultAppsSettings,
-  readAutostart,
+  readShellPrefs,
   writeAutostart,
   writeCloseBehavior,
+  writeDefaultHandler,
   writeFolderHandler,
   writeTrayVisible,
 } from "../../lib/system";
@@ -20,6 +21,7 @@ import {
 const TRAY_KEY = "oriel:pref-tray";
 const CLOSE_KEY = "oriel:pref-close-to-tray";
 const HANDLER_KEY = "oriel:pref-folder-handler";
+const DEFAULT_KEY = "oriel:pref-default-handler";
 
 function readFlag(key: string, fallback: boolean): boolean {
   try {
@@ -47,17 +49,23 @@ export function SettingsSystem() {
   const [tray, setTray] = useState(() => readFlag(TRAY_KEY, true));
   const [closeToTray, setCloseToTray] = useState(() => readFlag(CLOSE_KEY, true));
   const [handler, setHandler] = useState(() => readFlag(HANDLER_KEY, false));
+  const [defaultHandler, setDefaultHandler] = useState(() => readFlag(DEFAULT_KEY, false));
 
-  // The registry is the source of truth for autostart, not localStorage.
+  // Rust owns the real values (they must be known before the webview loads),
+  // and the registry is the source of truth for autostart.
   useEffect(() => {
-    void readAutostart().then((state) => setAutostart(state.enabled));
-  }, []);
-
-  // Push the persisted choices into the shell once on mount.
-  useEffect(() => {
-    void writeTrayVisible(tray);
-    void writeCloseBehavior(closeToTray);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void readShellPrefs().then((prefs) => {
+      if (!prefs) return;
+      setAutostart(prefs.autostart);
+      setTray(prefs.tray);
+      setCloseToTray(prefs.closeToTray);
+      setHandler(prefs.folderHandler);
+      setDefaultHandler(prefs.defaultHandler);
+      writeFlag(TRAY_KEY, prefs.tray);
+      writeFlag(CLOSE_KEY, prefs.closeToTray);
+      writeFlag(HANDLER_KEY, prefs.folderHandler);
+      writeFlag(DEFAULT_KEY, prefs.defaultHandler);
+    });
   }, []);
 
   const toggleAutostart = async (value: boolean) => {
@@ -69,7 +77,7 @@ export function SettingsSystem() {
       return;
     }
     setAutostart(value);
-    notify(value ? "已设置开机自启" : "已取消开机自启");
+    notify(value ? "已设置开机自启，登录后静默驻留托盘" : "已取消开机自启");
   };
 
   return (
@@ -84,21 +92,23 @@ export function SettingsSystem() {
           title="开机自启"
           detail={
             native
-              ? "登录 Windows 后在后台启动，不会自动弹出窗口"
+              ? tray
+                ? "登录 Windows 后在托盘静默启动，不会弹出窗口"
+                : "需要同时显示托盘图标，否则启动后无法唤回窗口"
               : "只在桌面版可用"
           }
         >
           <SettingsSwitch
             label="开机自启"
             selected={autostart}
-            disabled={!native || autostartBusy}
+            disabled={!native || autostartBusy || !tray}
             onChange={(value) => void toggleAutostart(value)}
           />
         </SettingsRow>
 
         <SettingsRow
           title="显示托盘图标"
-          detail="关掉后任务栏通知区不会留 Oriel；此时关闭窗口会直接退出"
+          detail="关掉后通知区不会留 Oriel；此时关闭窗口即退出，开机自启也会一并关闭"
         >
           <SettingsSwitch
             label="显示托盘图标"
@@ -108,7 +118,13 @@ export function SettingsSystem() {
               setTray(value);
               writeFlag(TRAY_KEY, value);
               void writeTrayVisible(value);
-              notify(value ? "托盘图标已显示" : "托盘图标已隐藏");
+              // Without a tray icon there is no way back into a hidden window.
+              if (!value && autostart) {
+                void writeAutostart(false).then(() => setAutostart(false));
+                notify("已隐藏托盘图标，并取消开机自启");
+              } else {
+                notify(value ? "托盘图标已显示" : "托盘图标已隐藏");
+              }
             }}
           />
         </SettingsRow>
@@ -130,7 +146,34 @@ export function SettingsSystem() {
         </SettingsRow>
       </SettingsSection>
 
-      <SettingsSection title="与资源管理器共存">
+      <SettingsSection title="替代资源管理器">
+        <SettingsRow
+          title="设为默认资源管理器"
+          detail="把 Oriel 注册为文件夹和磁盘的打开方式，然后在「默认应用」里确认。Windows 不允许程序静默顶替 Explorer，直接改 Winlogon\Shell 会连桌面和任务栏一起接管，这里用的是受支持的做法。"
+        >
+          <SettingsSwitch
+            label="注册为默认打开方式"
+            selected={defaultHandler}
+            disabled={!native}
+            onChange={(value) => {
+              void writeDefaultHandler(value).then((ok) => {
+                if (!ok && value) {
+                  notify("未能写入注册表");
+                  return;
+                }
+                setDefaultHandler(value);
+                writeFlag(DEFAULT_KEY, value);
+                if (value) {
+                  void openDefaultAppsSettings();
+                  notify("已注册，请在「默认应用」中选择 Oriel");
+                } else {
+                  notify("已取消默认打开方式");
+                }
+              });
+            }}
+          />
+        </SettingsRow>
+
         <SettingsRow
           title="在文件夹右键菜单中显示「用 Oriel 打开」"
           detail="同时作用于文件夹、文件夹空白处和磁盘；不改动系统默认行为"
@@ -153,10 +196,7 @@ export function SettingsSystem() {
           />
         </SettingsRow>
 
-        <SettingsRow
-          title="设为默认资源管理器"
-          detail="Windows 没有开放替换 shell 的接口；强行改 Winlogon\Shell 会连桌面和任务栏一起接管，出问题很难恢复。这里提供的是受支持的做法：在「默认应用」里为「文件资源管理器」选择 Oriel"
-        >
+        <SettingsRow title="打开 Windows 默认应用" detail="手动把 Oriel 设为文件夹的默认打开方式">
           <button
             type="button"
             disabled={!native}

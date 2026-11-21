@@ -47,6 +47,11 @@ try {
   await fs.mkdir(alpha);
   await fs.mkdir(beta);
   await fs.writeFile(path.join(alpha, "note.txt"), "hello from mac explorer", "utf8");
+  await fs.writeFile(
+    path.join(beta, "2024-annual-report.txt"),
+    "tokenised search fixture",
+    "utf8",
+  );
 
   const list = await app.inject({
     method: "GET",
@@ -67,6 +72,16 @@ try {
     "search",
     search.statusCode === 200 && search.json().entries.length === 1,
     `${search.json().entries.length} hit(s)`,
+  );
+
+  const multiTerm = await app.inject({
+    method: "GET",
+    url: `/api/fs/search?path=${encodeURIComponent(workdir)}&q=${encodeURIComponent("annual 2024")}`,
+  });
+  record(
+    "search matches terms in any order",
+    multiTerm.statusCode === 200 && multiTerm.json().entries.length === 1,
+    `${multiTerm.json().entries.length} hit(s)`,
   );
 
   const rename = await app.inject({

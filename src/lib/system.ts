@@ -1,7 +1,7 @@
 import { isNativeShellAvailable } from "./shell";
 
 /**
- * Desktop-only integration: autostart, tray, folder handler.
+ * Desktop-only integration: autostart, tray, folder handler, command line.
  *
  * Everything here is a Tauri command, so in the browser build each helper
  * reports "unsupported" instead of pretending it worked.
@@ -17,12 +17,30 @@ export interface AutostartState {
   supported: boolean;
 }
 
+/** Persisted by Rust, so it can be applied before the webview exists. */
+export interface ShellPrefs {
+  tray: boolean;
+  closeToTray: boolean;
+  autostart: boolean;
+  folderHandler: boolean;
+  defaultHandler: boolean;
+}
+
 export async function readAutostart(): Promise<AutostartState> {
   if (!isNativeShellAvailable()) return { enabled: false, supported: false };
   try {
     return await invoke<AutostartState>("get_autostart");
   } catch {
     return { enabled: false, supported: false };
+  }
+}
+
+export async function readShellPrefs(): Promise<ShellPrefs | null> {
+  if (!isNativeShellAvailable()) return null;
+  try {
+    return await invoke<ShellPrefs>("get_shell_prefs");
+  } catch {
+    return null;
   }
 }
 
@@ -48,7 +66,38 @@ export async function writeFolderHandler(enabled: boolean): Promise<boolean> {
   return invoke<boolean>("set_folder_handler", { enabled });
 }
 
+/** Registers Oriel as a folder handler and opens Windows' Default apps page. */
+export async function writeDefaultHandler(enabled: boolean): Promise<boolean> {
+  if (!isNativeShellAvailable()) return false;
+  return invoke<boolean>("set_default_file_manager", { enabled });
+}
+
 export async function openDefaultAppsSettings(): Promise<void> {
   if (!isNativeShellAvailable()) return;
   await invoke("open_default_apps");
+}
+
+/** Kills and restarts the bundled local service. */
+export async function restartService(): Promise<void> {
+  if (!isNativeShellAvailable()) return;
+  await invoke("restart_service");
+}
+
+/** Folder paths passed on the command line by the shell integration. */
+export async function takeStartupPaths(): Promise<string[]> {
+  if (!isNativeShellAvailable()) return [];
+  try {
+    return await invoke<string[]>("take_startup_paths");
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Launches a downloaded installer and quits. The service restricts this to
+ * files under `%TEMP%\oriel-updates`, so a bad update feed cannot run anything.
+ */
+export async function installUpdate(path: string): Promise<void> {
+  if (!isNativeShellAvailable()) return;
+  await invoke("install_update", { path });
 }

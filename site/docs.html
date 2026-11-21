@@ -4,353 +4,270 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
-    <title>Oriel 文档 — 架构、接口与用法</title>
+    <title>使用指南 — Oriel</title>
     <meta
       name="description"
-      content="Oriel 的项目文档：技术栈、三层架构、REST API、界面能力、构建与发布流程。"
+      content="Oriel 使用指南：安装、快捷键、搜索、预览、批量重命名、压缩包、回收站、系统集成与更新。"
     />
     <link rel="stylesheet" href="./style.css" />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a84ff'/%3E%3Ctext x='16' y='22' font-family='-apple-system,system-ui' font-size='17' font-weight='700' fill='white' text-anchor='middle'%3EO%3C/text%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='4' y='9' width='24' height='17' rx='4' fill='%230a6fe8'/%3E%3Cpath d='M4 13h11V9.5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2V13Z' fill='%230a6fe8'/%3E%3C/svg%3E"
     />
   </head>
   <body>
     <header class="nav">
-      <div class="container nav__inner">
-        <a class="wordmark" href="./index.html">
-          <span class="wordmark__mark">O</span>
+      <div class="wrap nav__inner">
+        <a class="brand" href="./index.html">
+          <span class="brand__tab" aria-hidden="true"></span>
           Oriel
         </a>
-        <nav class="nav__links">
+        <nav class="nav__links" aria-label="主导航">
           <a href="./index.html#features">功能</a>
+          <a href="./index.html#compare">对比</a>
           <a href="./index.html#shots">界面</a>
-          <a href="./docs.html">文档</a>
+          <a href="./docs.html">使用指南</a>
           <a href="https://github.com/Soulmte/Oriel">GitHub</a>
         </nav>
-        <a class="nav__cta" href="https://github.com/Soulmte/Oriel/releases/latest">下载</a>
+        <a class="btn btn--small" href="./index.html#download">下载</a>
       </div>
     </header>
 
-    <div class="container docs">
-      <aside class="toc">
+    <div class="wrap docs">
+      <aside class="toc" aria-label="目录">
         <h2>目录</h2>
         <ol>
-          <li><a href="#overview">概览</a></li>
-          <li><a href="#stack">技术栈</a></li>
-          <li><a href="#architecture">架构</a></li>
-          <li><a href="#tree">目录结构</a></li>
-          <li><a href="#start">快速开始</a></li>
-          <li><a href="#scripts">常用脚本</a></li>
-          <li><a href="#api">REST API</a></li>
-          <li><a href="#ui">界面能力</a></li>
-          <li><a href="#icons">图标预览</a></li>
-          <li><a href="#release">构建与发布</a></li>
-          <li><a href="#limits">已知限制</a></li>
+          <li><a href="#install">安装</a></li>
+          <li><a href="#first-run">第一次打开</a></li>
+          <li><a href="#shortcuts">常用快捷键</a></li>
+          <li><a href="#search">搜索</a></li>
+          <li><a href="#preview">预览</a></li>
+          <li><a href="#rename">批量重命名</a></li>
+          <li><a href="#archives">压缩包</a></li>
+          <li><a href="#recycle">回收站</a></li>
+          <li><a href="#system">系统集成</a></li>
+          <li><a href="#update">更新与国内镜像</a></li>
+          <li><a href="#faq">常见问题</a></li>
         </ol>
       </aside>
 
       <main class="prose">
-        <section id="overview">
-          <h2>概览</h2>
+        <section id="install">
+          <h2>安装</h2>
           <p>
-            Oriel 是一个 macOS 风格的 Windows 文件管理器。界面由 React 19 画在 Tauri 的
-            WebView2 里，文件操作交给本机的 Fastify 服务；两者通过 HTTP 和 SSE 通信，全部监听
-            <code>127.0.0.1</code>，不依赖任何云端。
+            从 GitHub 或国内镜像下载最新的安装包。安装包自带运行环境，
+            不需要再安装别的东西，也不需要管理员权限。
           </p>
-          <p>
-            因为它只是一个普通网页加上一个本地服务，所以同一份界面既能在 Tauri 窗口里跑，也能在浏览器里
-            <code>npm run dev</code> 直接调试。
+          <ol>
+            <li>双击安装包，按提示选择安装位置。</li>
+            <li>安装完成后从开始菜单打开 Oriel。</li>
+            <li>
+              首次运行时 Windows 可能提示未知发布者。选择「更多信息」→「仍要运行」。
+            </li>
+          </ol>
+          <p class="note">
+            安装包未做代码签名，所以 SmartScreen 会多问一句。安装包来自本项目的发布页，
+            校验可以对照发布页上的文件大小与更新时间。
           </p>
-          <div class="note">
-            当前版本已经打通：浏览、导航、流式搜索、多选、新建 / 重命名 / 复制 / 剪切 / 粘贴 / 删除、
-            拖放移动、归档浏览与解压、后台传输、回收站、撤销、预览面板、批量重命名、设置与自更新。
-          </div>
         </section>
 
-        <section id="stack">
-          <h2>技术栈</h2>
-          <table class="table">
+        <section id="first-run">
+          <h2>第一次打开</h2>
+          <p>
+            左侧是常用位置和磁盘，上方是前进后退、视图切换、排序和分组。
+            双击文件夹进入，双击文件用系统默认程序打开。
+          </p>
+          <ul>
+            <li>网格和列表随时切换：<kbd>Ctrl</kbd> + <kbd>1</kbd> / <kbd>2</kbd>。</li>
+            <li>地址栏可以直接编辑：<kbd>Ctrl</kbd> + <kbd>L</kbd>。</li>
+            <li>
+              右键菜单分文件、文件夹和空白处三套，可以在「设置 → 右键菜单」里逐项开关。
+            </li>
+            <li>每个文件夹会记住自己的视图、排序、分组和滚动位置。</li>
+          </ul>
+        </section>
+
+        <section id="shortcuts">
+          <h2>常用快捷键</h2>
+          <table class="table table--short">
             <thead>
               <tr>
-                <th>层</th>
-                <th>选型</th>
+                <th>操作</th>
+                <th>快捷键</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>桌面外壳</td>
-                <td>
-                  Tauri 2（无边框窗口 + 自绘红绿灯；Rust 侧通过 <code>windows</code> crate 调 Shell COM）
-                </td>
-              </tr>
-              <tr>
-                <td>前端</td>
-                <td>React 19、TypeScript、Vite 7、Tailwind CSS 4、HeroUI v3、zustand</td>
-              </tr>
-              <tr>
-                <td>图标</td>
-                <td>
-                  文档用 Office 风格白页 + 角标，代码用语言官方 logo，快捷方式与可执行文件走 Windows
-                  Shell 提取真实图标；覆盖 397 种扩展名 + 25 个特殊文件名
-                </td>
-              </tr>
-              <tr>
-                <td>后端</td>
-                <td>Node 22、Fastify 5、<code>trash</code>（回收站）、<code>sharp</code>（缩略图）</td>
-              </tr>
-              <tr>
-                <td>契约</td>
-                <td><code>packages/shared</code> 中的共享 DTO 与常量</td>
-              </tr>
+              <tr><td>搜索</td><td><kbd>Ctrl</kbd> + <kbd>F</kbd></td></tr>
+              <tr><td>编辑地址栏</td><td><kbd>Ctrl</kbd> + <kbd>L</kbd></td></tr>
+              <tr><td>预览选中项</td><td><kbd>空格</kbd></td></tr>
+              <tr><td>打开</td><td><kbd>Enter</kbd></td></tr>
+              <tr><td>上一级</td><td><kbd>Backspace</kbd></td></tr>
+              <tr><td>前进 / 后退</td><td><kbd>Ctrl</kbd> + <kbd>[</kbd> / <kbd>]</kbd></td></tr>
+              <tr><td>重命名 / 批量改名</td><td><kbd>F2</kbd></td></tr>
+              <tr><td>新建文件夹</td><td><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd></td></tr>
+              <tr><td>复制 / 剪切 / 粘贴</td><td><kbd>Ctrl</kbd> + <kbd>C</kbd> / <kbd>X</kbd> / <kbd>V</kbd></td></tr>
+              <tr><td>全选</td><td><kbd>Ctrl</kbd> + <kbd>A</kbd></td></tr>
+              <tr><td>删除到回收站</td><td><kbd>Delete</kbd></td></tr>
+              <tr><td>永久删除</td><td><kbd>Shift</kbd> + <kbd>Delete</kbd></td></tr>
+              <tr><td>撤销</td><td><kbd>Ctrl</kbd> + <kbd>Z</kbd></td></tr>
+              <tr><td>刷新</td><td><kbd>F5</kbd></td></tr>
+              <tr><td>显示隐藏文件</td><td><kbd>Ctrl</kbd> + <kbd>H</kbd></td></tr>
+              <tr><td>设置</td><td><kbd>Ctrl</kbd> + <kbd>,</kbd></td></tr>
             </tbody>
           </table>
         </section>
 
-        <section id="architecture">
-          <h2>架构</h2>
-          <pre><code>Tauri 窗口 (WebView2)
-   └── React 19 SPA（页面、主题、交互全在这里）
-          │  HTTP /api（JSON）
-          │  SSE  /events、/fs/search/stream
-          ▼
-     Fastify REST（127.0.0.1:8787）
-          ├── node:fs / trash      → 本地文件系统
-          ├── PowerShell           → 磁盘信息、剪贴板、字体
-          ├── 7-Zip CLI            → 归档读写
-          └── sharp                → 图片缩略图</code></pre>
-
-          <h3>几个关键取舍</h3>
+        <section id="search">
+          <h2>搜索</h2>
+          <p>
+            搜索框在工具栏右侧，按 <kbd>Ctrl</kbd> + <kbd>F</kbd> 可以直接跳过去。
+            默认范围是「此磁盘」，也可以在搜索框左边切换成「当前文件夹」或「所有磁盘」。
+          </p>
           <ul>
+            <li>空格分词：输入「report 2024」会匹配名字里同时含这两个词的文件，顺序不限。</li>
+            <li>结果边扫边出现，不必等整块磁盘扫完。</li>
+            <li>按 <kbd>Esc</kbd> 停止搜索并清空结果。</li>
             <li>
-              <strong>服务只监听回环地址</strong>：CORS 只放行 Tauri 源与 Vite 开发源，其它 Origin
-              一律 403，避免本机任意网页调用这些文件操作接口。
-            </li>
-            <li>
-              <strong>长路径</strong>：超过 260 字符的路径自动加 <code>\\?\</code> 前缀
-              （<code>server/src/lib/native-fs.ts</code>），不依赖系统的 <code>LongPathsEnabled</code>。
-            </li>
-            <li>
-              <strong>剪贴板</strong>：常驻一个 PowerShell STA 宿主，通过 stdin/stdout 一次一行 JSON
-              往返；每次新起进程要 400ms，太慢，这样读写都在 10–30ms。
-            </li>
-            <li>
-              <strong>Shell 菜单串行化</strong>：第三方 Shell 扩展不是线程安全的，右键菜单的 COM
-              调用排成单队列，避免堆损坏。
-            </li>
-            <li>
-              <strong>搜索</strong>：深度优先而非广度优先，10 秒预算、80 万条目上限，跳过
-              WinSxS / DriverStore 这类目录，结果通过 SSE 边搜边推。
+              系统目录会被跳过；结果条数或时间到达上限时，状态栏会说明结果可能不完整。
             </li>
           </ul>
         </section>
 
-        <section id="tree">
-          <h2>目录结构</h2>
-          <pre><code>packages/shared     共享 DTO、错误码与常量（源码导出）
-server              Fastify 服务
-  src/lib           路径、回收站、归档、图标、字体、任务队列、更新
-  src/routes        fs / recycle / system / archive / app 路由
-  scripts/smoke.ts  接口冒烟测试（真实文件操作）
-src                 前端
-  components        工具栏、侧栏、网格、列表、预览、设置页…
-  lib               图标系统、分组、排序、归档路径、外观偏好
-  store/explorer.ts 全局状态（视图、选择、任务、撤销栈）
-src-tauri           Rust 外壳：窗口、Shell COM、自更新
-site                这个静态站点（落地页与文档）
-docs                发布说明</code></pre>
-        </section>
-
-        <section id="start">
-          <h2>快速开始</h2>
-          <p>需要 Node 22 与 Rust（只有跑桌面版才需要 Rust）。</p>
-          <pre><code>npm install
-
-# 1) 只跑浏览器版（最快，用来调界面）
-npm run dev            # 打开 http://localhost:5173
-
-# 2) 跑桌面版（会自动等 8787 与 5173 就绪）
-npm run dev:desktop</code></pre>
+        <section id="preview">
+          <h2>预览</h2>
           <p>
-            桌面版会启动 Tauri 窗口并连接同一个 REST 服务。图标里的 Office / PDF /
-            可执行文件图标需要 Windows 环境，在纯浏览器里会退化成自绘图标。
+            选中文件按 <kbd>空格</kbd>，预览面板会在右侧打开。图片、PDF、文本、音频和视频
+            都能直接看，再按一次空格或按 <kbd>Esc</kbd> 收起。预览不会启动外部程序。
           </p>
         </section>
 
-        <section id="scripts">
-          <h2>常用脚本</h2>
-          <table class="table">
-            <thead>
-              <tr>
-                <th>命令</th>
-                <th>作用</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td><code>npm run dev</code></td><td>同时启动 REST 与前端（浏览器调试）</td></tr>
-              <tr><td><code>npm run dev:all</code></td><td>REST + 前端 + Tauri 窗口</td></tr>
-              <tr><td><code>npm run typecheck</code></td><td>前后端 TypeScript 检查</td></tr>
-              <tr><td><code>npm run smoke</code></td><td>对 REST 路由做 inject 冒烟测试（含真实文件操作，21 项）</td></tr>
-              <tr><td><code>npm run build</code></td><td>构建服务端产物 + 前端静态资源</td></tr>
-              <tr><td><code>npm run build:desktop</code></td><td>构建前端后执行 <code>tauri build</code></td></tr>
-              <tr><td><code>npm run icon</code></td><td>由 <code>src-tauri/app-icon.png</code> 生成各平台图标</td></tr>
-            </tbody>
-          </table>
-        </section>
-
-        <section id="api">
-          <h2>REST API</h2>
+        <section id="rename">
+          <h2>批量重命名</h2>
           <p>
-            统一前缀 <code>/api</code>，错误响应为 <code>{ "error": { "code", "message" } }</code>。
-            路径必须是绝对路径；删除磁盘根目录、<code>Windows</code>、<code>Program Files</code>、
-            <code>ProgramData</code>、用户目录根等系统目录会被拒绝。
+            选中多个项目后按 <kbd>F2</kbd>。查找替换、编号、添加前后缀和大小写可以叠加使用，
+            右侧会实时列出「原名 → 新名」。
           </p>
-          <table class="table">
-            <thead>
-              <tr>
-                <th>方法</th>
-                <th>路径</th>
-                <th>说明</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td>GET</td><td><code>/health</code></td><td>健康检查</td></tr>
-              <tr><td>GET</td><td><code>/system/info</code></td><td>平台、主机名、home、版本</td></tr>
-              <tr><td>GET</td><td><code>/drives</code></td><td>磁盘列表（容量 / 标签 / 类型）</td></tr>
-              <tr><td>GET</td><td><code>/special</code></td><td>个人、桌面、下载、图片等快捷目录</td></tr>
-              <tr><td>GET</td><td><code>/system/fonts</code></td><td>已安装字体族（10 分钟缓存）</td></tr>
-              <tr><td>GET</td><td><code>/app/update</code></td><td>检查 GitHub Releases</td></tr>
-              <tr><td>GET</td><td><code>/fs/list?path=&amp;showHidden=</code></td><td>列目录（文件夹优先、自然排序）</td></tr>
-              <tr><td>GET</td><td><code>/fs/stat?path=</code></td><td>单条信息</td></tr>
-              <tr><td>GET</td><td><code>/fs/preview?path=</code></td><td>文本预览（512 KB 上限）</td></tr>
-              <tr><td>GET</td><td><code>/fs/info?path=</code></td><td>图片分辨率、PDF 页数、只读 / 链接</td></tr>
-              <tr><td>GET</td><td><code>/fs/size?path=</code></td><td>文件夹递归大小（worker + 60s 缓存）</td></tr>
-              <tr><td>POST</td><td><code>/fs/sizes</code></td><td>批量查询，最多 3 个并发遍历</td></tr>
-              <tr><td>GET</td><td><code>/fs/media?path=</code></td><td>音视频内联流，支持 Range（206）</td></tr>
-              <tr><td>GET</td><td><code>/fs/search?path=&amp;q=</code></td><td>递归搜索（10 秒预算，可中止）</td></tr>
-              <tr><td>GET</td><td><code>/fs/search/stream</code></td><td>SSE 流式搜索：progress / matches / done</td></tr>
-              <tr><td>GET</td><td><code>/fs/thumbnail?path=&amp;size=</code></td><td>图片缩略图（webp，磁盘 + 内存缓存）</td></tr>
-              <tr><td>POST</td><td><code>/fs/icons</code></td><td>从 Windows Shell 提取真实图标</td></tr>
-              <tr><td>POST</td><td><code>/fs/entries</code></td><td>只 stat 指定子项（增量补丁用）</td></tr>
-              <tr><td>GET</td><td><code>/fs/resolve?path=</code></td><td>展开 <code>~</code>、<code>%VAR%</code></td></tr>
-              <tr><td>POST</td><td><code>/fs/conflicts</code></td><td>同名冲突列表</td></tr>
-              <tr><td>POST</td><td><code>/fs/transfer</code></td><td>后台复制 / 移动任务</td></tr>
-              <tr><td>GET</td><td><code>/events?watch=</code></td><td>SSE：目录变更与所有任务进度</td></tr>
-              <tr><td>POST</td><td><code>/fs/mkdir</code></td><td>新建文件夹</td></tr>
-              <tr><td>POST</td><td><code>/fs/new-file</code></td><td>新建文本文件（带初始内容）</td></tr>
-              <tr><td>POST</td><td><code>/fs/new-office-file</code></td><td>新建 docx / xlsx / pptx（服务端生成 OOXML 包）</td></tr>
-              <tr><td>POST</td><td><code>/fs/rename</code></td><td>单个重命名</td></tr>
-              <tr><td>POST</td><td><code>/fs/batch-rename</code></td><td>批量改名：全量校验 + 两步改名</td></tr>
-              <tr><td>POST</td><td><code>/fs/copy</code> · <code>/fs/move</code></td><td>同步复制 / 移动</td></tr>
-              <tr><td>POST</td><td><code>/fs/delete</code></td><td>默认进回收站，可永久删除</td></tr>
-              <tr><td>POST</td><td><code>/fs/clipboard</code></td><td>把文件列表写进 Windows 剪贴板（CF_HDROP）</td></tr>
-              <tr><td>GET</td><td><code>/fs/clipboard</code></td><td>读系统剪贴板里的文件列表</td></tr>
-              <tr><td>POST</td><td><code>/archive/extract</code> · <code>/archive/create</code></td><td>解压 / 打包（7-Zip）</td></tr>
-              <tr><td>GET</td><td><code>/recycle</code></td><td>回收站列表（解析 <code>$Recycle.Bin</code> 的 <code>$I</code> 元数据）</td></tr>
-              <tr><td>POST</td><td><code>/recycle/restore</code> · <code>purge</code> · <code>empty</code></td><td>还原 / 永久删除 / 清空</td></tr>
-            </tbody>
-          </table>
-        </section>
-
-        <section id="ui">
-          <h2>界面能力</h2>
-
-          <h3>浏览与选择</h3>
           <ul>
-            <li>图标网格与列表两种视图，可切换图标大小、列表密度，每个文件夹各记一份</li>
-            <li>单选、Ctrl 多选、Shift 连选、方向键移动、滚动跟随、空格预览</li>
-            <li>按名称 / 种类 / 日期 / 大小分组，列表视图的分组头吸顶并显示计数</li>
-            <li>面包屑可编辑（Ctrl+L），支持 <code>~</code>、<code>%TEMP%</code>、<code>$HOME</code></li>
-          </ul>
-
-          <h3>文件操作</h3>
-          <ul>
-            <li>新建文件夹与 11 种常用文件；Office 三件套是服务端生成的真 OOXML 包</li>
-            <li>单个与批量重命名（查找替换 / 编号 / 添加文本 / 大小写），带实时预览与冲突检测</li>
-            <li>复制 / 剪切 / 粘贴，与 Windows 剪贴板双向互通，能直接粘到微信或 QQ</li>
-            <li>拖放移动，按住 Ctrl 为复制；悬停 600ms 自动展开目标文件夹</li>
-            <li>删除默认进回收站，永久删除需二次确认；撤销栈保留 20 步</li>
-            <li>右键菜单分文件夹 / 文件 / 空白处三套，可逐项开关并与系统菜单项合并</li>
-          </ul>
-
-          <h3>系统集成（桌面版）</h3>
-          <ul>
-            <li>开机自启：写当前用户的 Run 键，登录后静默启动</li>
-            <li>托盘图标：可隐藏；关闭窗口时最小化到托盘，服务继续运行</li>
-            <li>文件夹右键菜单：为文件夹、文件夹空白处与磁盘添加「用 Oriel 打开」</li>
-          </ul>
-
-          <h3>归档</h3>
-          <ul>
-            <li>识别 7-Zip，把 zip / 7z / rar 当成只读目录浏览</li>
-            <li>可以只解压其中几项，也可以把选中项打包成 zip / 7z</li>
-            <li>归档内的写操作会被拒绝并提示只读</li>
-          </ul>
-
-          <h3>传输与状态</h3>
-          <ul>
-            <li>复制 / 移动 / 下载在服务端队列里跑，按字节报进度，可暂停、继续、重试、取消</li>
-            <li>同名冲突提供保留两者 / 替换 / 跳过 / 取消；替换先落暂存目录再原子换入</li>
-            <li>状态栏显示选中数量、文件 / 文件夹数、合计大小与磁盘余量</li>
+            <li>重名、非法字符和空名字会在应用前标出来。</li>
+            <li>交换两个名字、只改大小写都可以安全完成。</li>
+            <li>应用后按 <kbd>Ctrl</kbd> + <kbd>Z</kbd> 可以整批退回原名。</li>
           </ul>
         </section>
 
-        <section id="icons">
-          <h2>图标预览</h2>
+        <section id="archives">
+          <h2>压缩包</h2>
           <p>
-            仓库里的 <code>scripts/icon-preview.mjs</code> 会把每种扩展名、特殊文件名和一批真实文件生成到
-            <code>D:\oriel-icon-preview</code>，按 29 个分类目录排好，用来核对角标、页面比例与暗色表现。
-          </p>
-          <pre><code>npm run icon:preview     # 生成样张目录
-# D:\oriel-icon-preview\_全部扩展名      401 个文件
-# D:\oriel-icon-preview\98-Office检查   系统图标 vs 自绘页一致性
-# D:\oriel-icon-preview\99-徽标检查     {} &lt;/&gt; 咖啡杯等符号角标</code></pre>
-        </section>
-
-        <section id="release">
-          <h2>构建与发布</h2>
-          <pre><code># 本地打包（前端 + 服务端产物 + 安装包）
-npm run build
-npm run build:desktop
-
-# 打 tag 后由 GitHub Actions 构建并创建 Release
-git tag v0.1.0
-git push origin v0.1.0</code></pre>
-          <p>
-            应用内「设置 → 关于 → 检查更新」读取 <code>ORIEL_UPDATE_REPO=owner/repo</code> 的 GitHub
-            Releases。GitHub 的下载域名在部分网络下不可达时，可以设置
-            <code>ORIEL_UPDATE_CDN</code> 指向自建镜像。
-          </p>
-          <p>
-            站点本身是一组静态文件（<code>site/</code>），推送到 <code>main</code> 后由
-            <code>.github/workflows/pages.yml</code> 发布到 GitHub Pages：
-            <a href="https://soulmte.github.io/Oriel/">soulmte.github.io/Oriel</a>。
+            zip、7z 和 rar 可以像文件夹一样双击进入，查看目录和文件大小。
+            选中需要的项目直接解压，或者把整包解压到旁边的文件夹。
+            压缩包内容在浏览时是只读的。
           </p>
         </section>
 
-        <section id="limits">
-          <h2>已知限制</h2>
+        <section id="recycle">
+          <h2>回收站</h2>
+          <p>
+            <kbd>Delete</kbd> 把文件放进 Windows 回收站，
+            <kbd>Shift</kbd> + <kbd>Delete</kbd> 永久删除并先弹出确认。
+            侧栏的回收站会列出文件原来的位置和删除时间。
+          </p>
           <ul>
+            <li>可以还原到原位置；原位置已有同名项时会跳过并说明原因。</li>
+            <li>可以只清空选中项，也可以清空全部。</li>
+          </ul>
+        </section>
+
+        <section id="system">
+          <h2>系统集成</h2>
+          <p>
+            都在「设置 → 系统」里，只影响当前用户，不需要管理员权限。
+          </p>
+          <h3>开机自启与托盘</h3>
+          <ul>
+            <li>开启后，登录 Windows 时静默进入托盘，不会弹出窗口。</li>
+            <li>托盘图标可以隐藏；隐藏后会同时取消开机自启，避免启动后找不到窗口。</li>
+            <li>「关闭窗口时最小化到托盘」关掉后，点关闭就是退出。</li>
+          </ul>
+          <h3>右键菜单与默认打开方式</h3>
+          <ul>
+            <li>可以给文件夹、文件夹空白处和磁盘加上「用 Oriel 打开」。</li>
             <li>
-              安装包自带 Node 运行时与服务端（sidecar，约 33 MB）：窗口启动时会在后台起服务，
-              退出时一并结束；如果进程被强杀，服务也会因为 stdin 断开而自行退出
+              打开「设为默认资源管理器」后，Oriel 会注册成文件夹的打开方式，
+              并跳到 Windows 的「默认应用」页面，由你确认。
             </li>
-            <li>REST 服务未做多用户隔离，仅适合单机使用</li>
-            <li>Office / 可执行文件图标依赖 Windows Shell，非 Windows 环境会退化成自绘图标</li>
-            <li>安装包未签名，首次运行需要在 SmartScreen 中选择「仍要运行」</li>
-            <li>归档写操作只读，编辑归档内文件需要先解压</li>
           </ul>
+          <p class="note">
+            Windows 不允许程序静默顶替资源管理器。Oriel 不会接管桌面、任务栏和
+            <kbd>Win</kbd> + <kbd>E</kbd>；它做的是把文件夹窗口换成自己。
+            卸载时注册表开关不会自动清理，可以先在设置里关掉。
+          </p>
+        </section>
+
+        <section id="update">
+          <h2>更新与国内镜像</h2>
+          <p>
+            打开「设置 → 关于」，Oriel 会自动检查新版本。也可以点「重新检查」立即刷新。
+            下载完成后点「立即安装并退出」，安装程序会接着完成更新。
+          </p>
+          <ul>
+            <li>下载会先尝试国内镜像，再回落到 GitHub。</li>
+            <li>
+              GitHub 打不开或下载很慢时，可以直接去
+              <a href="https://gitee.com/Soulmte/Oriel/releases">Gitee 发布页</a>
+              手动下载安装包。
+            </li>
+            <li>更新不会动你的偏好设置、文件夹记忆和右键菜单配置。</li>
+          </ul>
+        </section>
+
+        <section id="faq">
+          <h2>常见问题</h2>
+          <h3>打开后显示「服务未连接」</h3>
+          <p>
+            第一次启动需要几秒钟准备。如果一直显示未连接，打开「设置 → 本地服务」，
+            点「重启」即可；Oriel 也会在后台自动尝试恢复。
+          </p>
+
+          <h3>搜索找不到某个文件</h3>
+          <p>
+            先确认搜索范围是不是「当前文件夹」，再检查是否开启了「显示隐藏文件」。
+            系统目录会被主动跳过；结果条数或时间到上限时，状态栏会给出提示。
+          </p>
+
+          <h3>能完全替代资源管理器吗</h3>
+          <p>
+            可以设为文件夹的默认打开方式，也可以挂在右键菜单里。桌面、任务栏和
+            <kbd>Win</kbd> + <kbd>E</kbd> 仍由 Windows 管理，这是系统本身的限制。
+          </p>
+
+          <h3>文件会被上传吗</h3>
+          <p>
+            不会。浏览、搜索、预览、改名、复制和压缩都在本机完成，不联网也能用。
+          </p>
+
+          <h3>为什么提示未知发布者</h3>
+          <p>
+            安装包没有做代码签名。选择「更多信息」→「仍要运行」即可。
+          </p>
+
+          <h3>卸载后右键菜单还在</h3>
+          <p>
+            右键菜单和开机自启写在当前用户的注册表里，卸载程序不会自动删除。
+            卸载前先在「设置 → 系统」里把对应开关关掉即可。
+          </p>
         </section>
       </main>
     </div>
 
     <footer class="footer">
-      <div class="container footer__inner">
-        <span>Oriel</span>
+      <div class="wrap footer__inner">
+        <span class="footer__brand">
+          <span class="brand__tab" aria-hidden="true"></span>
+          Oriel
+        </span>
         <a href="./index.html">首页</a>
-        <a href="https://github.com/Soulmte/Oriel">源码</a>
+        <a href="https://github.com/Soulmte/Oriel">GitHub</a>
         <a href="https://github.com/Soulmte/Oriel/issues">反馈</a>
-        <span class="footer__spacer">文档与界面同步更新</span>
+        <span class="footer__spacer">界面参考 macOS Finder 的视觉语言，不含 Apple 素材</span>
       </div>
     </footer>
   </body>

@@ -258,6 +258,12 @@ export async function searchDirectory(
   options: SearchOptions,
 ): Promise<SearchResult> {
   const normalizedQuery = query.trim().toLowerCase();
+  // Space-separated terms are an AND filter: “report 2024” matches
+  // “2024-annual-report.pdf” in either word order.
+  const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) {
+    return { entries: [], scanned: 0, truncated: false, timedOut: false };
+  }
   const limit = Math.min(Math.max(options.limit ?? SEARCH_RESULT_LIMIT, 1), 1000);
   const deadline = Date.now() + (options.budgetMs ?? SEARCH_BUDGET_MS);
 
@@ -323,7 +329,7 @@ export async function searchDirectory(
       // descended into: that is what keeps a whole-disk scan loop-free.
       const isDir = dirent.isDirectory();
 
-      if (lower.includes(normalizedQuery)) {
+      if (tokens.every((token) => lower.includes(token))) {
         const entry = await toEntry(path.join(current.dir, name), name, isDir);
         if (entry) {
           results.push(entry);

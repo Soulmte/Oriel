@@ -37,18 +37,29 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
   app.get("/system/fonts", async () => ({ fonts: await listFonts() }));
 
   /** Latest GitHub release, used by the update section in the settings. */
-  app.get("/app/update", async () => checkForUpdate());
+  app.get("/app/update", async (request) => {
+    const query = request.query as Record<string, string | undefined>;
+    // “重新检查” must hit the network instead of replaying the 10-minute cache.
+    return checkForUpdate(query.refresh === "1" || query.refresh === "true");
+  });
 
   /** Downloads a release asset into the temp folder, with real progress. */
   app.post("/app/update/download", async (request) => {
     const body = (request.body ?? {}) as Record<string, unknown>;
-    const url = typeof body.url === "string" ? body.url.trim() : "";
     const name = typeof body.name === "string" ? body.name.trim() : "update";
+    const raw = Array.isArray(body.urls)
+      ? body.urls.filter((value): value is string => typeof value === "string")
+      : typeof body.url === "string"
+        ? [body.url]
+        : [];
+    const urls = [...new Set(raw.map((value) => value.trim()))]
+      .filter((value) => /^https?:\/\//i.test(value))
+      .slice(0, 3);
 
-    if (!/^https?:\/\//i.test(url)) {
+    if (urls.length === 0) {
       throw ApiError.badRequest("INVALID_URL", "下载地址无效");
     }
 
-    return createDownload(url, name);
+    return createDownload(urls, name);
   });
 };

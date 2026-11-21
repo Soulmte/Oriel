@@ -23,6 +23,11 @@ export const config = {
   // `npm run dev` honest too.
   updateRepo: (process.env.ORIEL_UPDATE_REPO ?? "Soulmte/Oriel").trim(),
   /**
+   * The Gitee mirror of the same repository. It ships the same release assets
+   * and is the fallback when the GitHub API or asset hosts are unreachable.
+   */
+  giteeRepo: (process.env.ORIEL_UPDATE_GITEE ?? "Soulmte/Oriel").trim(),
+  /**
    * Optional CDN prefix for release assets, e.g. `https://dl.example.com/oriel`.
    * GitHub asset hosts are unreachable on some networks; with this set the
    * downloader uses `<cdn>/<tag>/<asset name>` instead.

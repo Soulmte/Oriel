@@ -7,14 +7,14 @@
 //! handle, exposes tray/autostart/handler toggles as commands, and cleans up on
 //! exit.
 
-use std::net::{TcpStream};
+use std::net::TcpStream;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, State, WindowEvent};
@@ -29,9 +29,49 @@ pub struct TrayHandle(pub Mutex<Option<TrayIcon>>);
 /// front end through `set_close_behavior`, read by the close handler.
 pub struct CloseBehavior(pub AtomicBool);
 
+/// Paths passed on the command line (`Oriel.exe "C:\\Users"`), consumed by the
+/// front end once the service is up so a folder double-click lands in Oriel.
+pub struct StartupPaths(pub Mutex<Vec<String>>);
+
 const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
 const RUN_VALUE: &str = "Oriel";
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+const UPDATE_DIR: &str = "oriel-updates";
+
+/// Persisted shell preferences. localStorage belongs to the webview and is not
+/// readable before the window exists, so the tray/close choices live here where
+/// the Rust side can apply them on the very first boot.
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ShellPrefs {
+    #[serde(default = "default_true")]
+    pub tray: bool,
+    #[serde(default = "default_true")]
+    pub close_to_tray: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for ShellPrefs {
+    fn default() -> Self {
+        Self {
+            tray: true,
+            close_to_tray: true,
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShellPrefsDto {
+    tray: bool,
+    close_to_tray: bool,
+    autostart: bool,
+    folder_handler: bool,
+    default_handler: bool,
+}
 
 /// Tauri resolves paths with the verbatim `\\?\` prefix, which Node's ESM
 /// loader does not understand; strip it before handing paths to the service.
@@ -68,6 +108,61 @@ fn service_dir(app: &AppHandle) -> Option<PathBuf> {
         }
     }
     None
+}
+
+fn prefs_path(app: &AppHandle) -> Option<PathBuf> {
+    app.path()
+        .app_config_dir()
+        .ok()
+        .map(|dir| dir.join("shell.json"))
+}
+
+pub fn read_shell_prefs(app: &AppHandle) -> ShellPrefs {
+    let Some(path) = prefs_path(app) else {
+        return ShellPrefs::default();
+    };
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|text| serde_json::from_str::<ShellPrefs>(&text).ok())
+        .unwrap_or_default()
+}
+
+fn write_shell_prefs(app: &AppHandle, prefs: &ShellPrefs) {
+    let Some(path) = prefs_path(app) else {
+        return;
+    };
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if let Ok(text) = serde_json::to_string_pretty(prefs) {
+        let _ = std::fs::write(path, text);
+    }
+}
+
+fn update_shell_prefs(app: &AppHandle, update: impl FnOnce(&mut ShellPrefs)) {
+    let mut prefs = read_shell_prefs(app);
+    update(&mut prefs);
+    write_shell_prefs(app, &prefs);
+}
+
+fn registry_key_exists(key: &str) -> bool {
+    reg(&["query", key])
+        .output()
+        .map(|out| out.status.success())
+        .unwrap_or(false)
+}
+
+/// `reg.exe` is a console program: without this flag every toggle flashes a
+/// black window over the file manager.
+fn reg(args: &[&str]) -> Command {
+    let mut command = Command::new("reg");
+    command.args(args);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
 }
 
 fn log(message: &str) {
@@ -113,16 +208,24 @@ fn spawn_service(app: &AppHandle) -> Option<Child> {
         .and_then(|path| std::fs::File::create(path).ok());
 
     let mut command = Command::new(dir.join("node.exe"));
+    let gitee_repo = option_env!("ORIEL_UPDATE_GITEE_REPO").unwrap_or("Soulmte/Oriel");
     command
         .arg(&entry)
         .current_dir(dir.join("app"))
         // The updater has no build-time env, so the repository is passed here.
         .env("ORIEL_UPDATE_REPO", "Soulmte/Oriel")
+        .env("ORIEL_UPDATE_GITEE", gitee_repo)
         .env("ORIEL_HOST", "127.0.0.1")
         .env("ORIEL_PORT", api_port().to_string())
         // A live pipe: when Oriel exits (even after a crash) the child sees EOF
         // and shuts itself down instead of leaking a server on port 8787.
         .stdin(Stdio::piped());
+    // CI bakes the CDN prefix in; local builds simply skip it.
+    if let Some(cdn) = option_env!("ORIEL_UPDATE_CDN") {
+        if !cdn.trim().is_empty() {
+            command.env("ORIEL_UPDATE_CDN", cdn.trim());
+        }
+    }
     match log_file {
         Some(file) => {
             let clone = file.try_clone().ok();
@@ -253,10 +356,15 @@ fn current_exe_quoted() -> String {
     format!("\"{}\"", exe.display())
 }
 
+/// Autostart launches into the tray instead of stealing focus at login, so the
+/// Run value carries `--hidden`; the Rust side honours it on the next start.
+fn current_exe_for_run() -> String {
+    format!("{} --hidden", current_exe_quoted())
+}
+
 #[tauri::command]
 pub fn get_autostart() -> AutostartState {
-    let enabled = Command::new("reg")
-        .args(["query", RUN_KEY, "/v", RUN_VALUE])
+    let enabled = reg(&["query", RUN_KEY, "/v", RUN_VALUE])
         .output()
         .map(|out| out.status.success())
         .unwrap_or(false);
@@ -267,25 +375,34 @@ pub fn get_autostart() -> AutostartState {
 }
 
 #[tauri::command]
+pub fn get_shell_prefs(app: AppHandle) -> ShellPrefsDto {
+    let prefs = read_shell_prefs(&app);
+    ShellPrefsDto {
+        tray: prefs.tray,
+        close_to_tray: prefs.close_to_tray,
+        autostart: get_autostart().enabled,
+        folder_handler: registry_key_exists(r"HKCU\Software\Classes\Directory\shell\Oriel"),
+        default_handler: registry_key_exists(r"HKCU\Software\Classes\Oriel.Folder"),
+    }
+}
+
+#[tauri::command]
 pub fn set_autostart(enabled: bool) -> Result<bool, String> {
     let status = if enabled {
-        Command::new("reg")
-            .args([
-                "add",
-                RUN_KEY,
-                "/v",
-                RUN_VALUE,
-                "/t",
-                "REG_SZ",
-                "/d",
-                &current_exe_quoted(),
-                "/f",
-            ])
-            .status()
+        reg(&[
+            "add",
+            RUN_KEY,
+            "/v",
+            RUN_VALUE,
+            "/t",
+            "REG_SZ",
+            "/d",
+            &current_exe_for_run(),
+            "/f",
+        ])
+        .status()
     } else {
-        Command::new("reg")
-            .args(["delete", RUN_KEY, "/v", RUN_VALUE, "/f"])
-            .status()
+        reg(&["delete", RUN_KEY, "/v", RUN_VALUE, "/f"]).status()
     };
 
     status
@@ -294,8 +411,9 @@ pub fn set_autostart(enabled: bool) -> Result<bool, String> {
 }
 
 #[tauri::command]
-pub fn set_close_behavior(state: State<'_, CloseBehavior>, minimize: bool) {
+pub fn set_close_behavior(app: AppHandle, state: State<'_, CloseBehavior>, minimize: bool) {
     state.0.store(minimize, Ordering::Relaxed);
+    update_shell_prefs(&app, |prefs| prefs.close_to_tray = minimize);
 }
 
 #[tauri::command]
@@ -304,18 +422,98 @@ pub fn set_tray_visible(
     state: State<'_, TrayHandle>,
     visible: bool,
 ) -> Result<(), String> {
-    let mut slot = state.0.lock().map_err(|error| error.to_string())?;
-    if visible {
-        if slot.is_none() {
-            *slot = Some(build_tray(&app).map_err(|error| error.to_string())?);
+    {
+        let mut slot = state.0.lock().map_err(|error| error.to_string())?;
+        if visible {
+            if slot.is_none() {
+                *slot = Some(build_tray(&app).map_err(|error| error.to_string())?);
+            }
+            if let Some(tray) = slot.as_ref() {
+                let _ = tray.set_visible(true);
+            }
+        } else if let Some(tray) = slot.as_ref() {
+            // Keep the handle so it can come back without a restart.
+            let _ = tray.set_visible(false);
         }
-        if let Some(tray) = slot.as_ref() {
-            let _ = tray.set_visible(true);
-        }
-    } else if let Some(tray) = slot.as_ref() {
-        // Keep the handle so it can come back without a restart.
-        let _ = tray.set_visible(false);
     }
+    update_shell_prefs(&app, |prefs| prefs.tray = visible);
+    Ok(())
+}
+
+/// Kills the bundled service and starts it again. The settings page calls this
+/// when the port was held by a stale process after an upgrade.
+#[tauri::command]
+pub fn restart_service(app: AppHandle) -> Result<(), String> {
+    stop_service(&app);
+    // Give Windows a moment to release the listening socket.
+    std::thread::sleep(Duration::from_millis(150));
+    let handle = app.clone();
+    std::thread::spawn(move || ensure_service(&handle));
+    Ok(())
+}
+
+#[tauri::command]
+pub fn take_startup_paths(state: State<'_, StartupPaths>) -> Vec<String> {
+    state
+        .0
+        .lock()
+        .map(|mut paths| std::mem::take(&mut *paths))
+        .unwrap_or_default()
+}
+
+/// Downloads finish in `%TEMP%\oriel-updates`; only an installer from there may
+/// be launched, so a compromised update feed cannot run arbitrary binaries.
+#[tauri::command]
+pub fn install_update(app: AppHandle, path: String) -> Result<(), String> {
+    let installer = plain(PathBuf::from(path));
+    if !installer.is_file() {
+        return Err("安装包已不存在，请重新下载".into());
+    }
+    let allowed = std::env::temp_dir().join(UPDATE_DIR);
+    let canonical = std::fs::canonicalize(&installer).map_err(|error| error.to_string())?;
+    let canonical_allowed =
+        std::fs::canonicalize(&allowed).map_err(|error| error.to_string())?;
+    if !canonical.starts_with(&canonical_allowed) {
+        return Err("安装包不在更新目录中".into());
+    }
+
+    let ext = canonical
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let target = canonical.to_string_lossy().to_string();
+    let mut command = match ext.as_str() {
+        "exe" => {
+            let mut command = Command::new("cmd");
+            command.args(["/C", "start", "", &target]);
+            command
+        }
+        "msi" => {
+            let mut command = Command::new("cmd");
+            command.args(["/C", "start", "", "msiexec", "/i", &target]);
+            command
+        }
+        _ => return Err("不支持的安装包类型".into()),
+    };
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|error| error.to_string())?;
+
+    // Let the installer process start before this one releases its files.
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(600));
+        handle.exit(0);
+    });
     Ok(())
 }
 
@@ -338,35 +536,41 @@ pub fn set_folder_handler(enabled: bool) -> Result<bool, String> {
 
     for (key, argument) in targets {
         if enabled {
-            let _ = Command::new("reg")
-                .args(["add", key, "/ve", "/t", "REG_SZ", "/d", "用 Oriel 打开", "/f"])
-                .status();
-            let _ = Command::new("reg")
-                .args([
-                    "add",
-                    &format!("{key}\\Icon"),
-                    "/ve",
-                    "/t",
-                    "REG_SZ",
-                    "/d",
-                    &exe,
-                    "/f",
-                ])
-                .status();
-            let _ = Command::new("reg")
-                .args([
-                    "add",
-                    &format!("{key}\\command"),
-                    "/ve",
-                    "/t",
-                    "REG_SZ",
-                    "/d",
-                    &format!("{exe} \"{argument}\""),
-                    "/f",
-                ])
-                .status();
+            let _ = reg(&[
+                "add",
+                key,
+                "/ve",
+                "/t",
+                "REG_SZ",
+                "/d",
+                "用 Oriel 打开",
+                "/f",
+            ])
+            .status();
+            let _ = reg(&[
+                "add",
+                &format!("{key}\\Icon"),
+                "/ve",
+                "/t",
+                "REG_SZ",
+                "/d",
+                &exe,
+                "/f",
+            ])
+            .status();
+            let _ = reg(&[
+                "add",
+                &format!("{key}\\command"),
+                "/ve",
+                "/t",
+                "REG_SZ",
+                "/d",
+                &format!("{exe} \"{argument}\""),
+                "/f",
+            ])
+            .status();
         } else {
-            let _ = Command::new("reg").args(["delete", key, "/f"]).status();
+            let _ = reg(&["delete", key, "/f"]).status();
         }
     }
 
@@ -377,10 +581,110 @@ pub fn set_folder_handler(enabled: bool) -> Result<bool, String> {
 pub fn open_default_apps() {
     #[cfg(windows)]
     {
+        use std::os::windows::process::CommandExt;
+        // Windows 11 jumps straight to Oriel's own page; Windows 10 ignores the
+        // query and lands on the general Default apps list.
         let _ = Command::new("cmd")
-            .args(["/C", "start", "", "ms-settings:defaultapps"])
+            .args([
+                "/C",
+                "start",
+                "",
+                "ms-settings:defaultapps?registeredAppUser=Oriel",
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
             .spawn();
     }
+}
+
+/// Registers Oriel as a supported handler for folders and drives, then opens
+/// the Default apps page where Windows lets the user pick it. Windows does not
+/// expose an API that silently replaces Explorer, and hijacking
+/// `Winlogon\Shell` would take the desktop and taskbar with it.
+#[tauri::command]
+pub fn set_default_file_manager(enabled: bool) -> Result<bool, String> {
+    let exe = current_exe_quoted();
+    let prog_id = r"HKCU\Software\Classes\Oriel.Folder";
+
+    if !enabled {
+        for key in [
+            prog_id,
+            r"HKCU\Software\Classes\Directory\OpenWithProgids\Oriel.Folder",
+            r"HKCU\Software\Classes\Drive\OpenWithProgids\Oriel.Folder",
+            r"HKCU\Software\Classes\Applications\Oriel.exe",
+        ] {
+            let _ = reg(&["delete", key, "/f"]).status();
+        }
+        return Ok(false);
+    }
+
+    // (key, value name — None means the key's default value, data)
+    let entries: Vec<(String, Option<&str>, String)> = vec![
+        (prog_id.to_string(), None, "Oriel 文件夹".into()),
+        (
+            format!("{prog_id}\\DefaultIcon"),
+            None,
+            format!("{exe},0"),
+        ),
+        (
+            format!("{prog_id}\\shell\\open\\command"),
+            None,
+            format!("{exe} \"%1\""),
+        ),
+        (
+            r"HKCU\Software\Classes\Directory\OpenWithProgids".into(),
+            Some("Oriel.Folder"),
+            String::new(),
+        ),
+        (
+            r"HKCU\Software\Classes\Drive\OpenWithProgids".into(),
+            Some("Oriel.Folder"),
+            String::new(),
+        ),
+        (
+            r"HKCU\Software\Classes\Applications\Oriel.exe".into(),
+            Some("FriendlyAppName"),
+            "Oriel".into(),
+        ),
+    ];
+
+    for (key, name, value) in entries {
+        let mut args: Vec<&str> = vec!["add", key.as_str()];
+        match name {
+            Some(name) => args.extend([
+                "/v",
+                name,
+                "/t",
+                "REG_SZ",
+                "/d",
+                value.as_str(),
+                "/f",
+            ]),
+            None => args.extend([
+                "/ve",
+                "/t",
+                "REG_SZ",
+                "/d",
+                value.as_str(),
+                "/f",
+            ]),
+        }
+        let _ = reg(&args).status();
+    }
+
+    // The Applications entry makes `Oriel.exe` appear under Open with…
+    let _ = reg(&[
+        "add",
+        r"HKCU\Software\Classes\Applications\Oriel.exe\shell\open\command",
+        "/ve",
+        "/t",
+        "REG_SZ",
+        "/d",
+        &format!("{exe} \"%1\""),
+        "/f",
+    ])
+    .status();
+
+    Ok(true)
 }
 
 /* ----------------------------------------------------------------- setup */
