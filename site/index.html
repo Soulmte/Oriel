@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Oriel — 为 Windows 做的 Finder</title>
+    <meta
+      name="description"
+      content="Oriel 是一个 macOS 风格的 Windows 文件管理器：网格图标、批量重命名、归档浏览、本地流式搜索。Tauri 2 + React 19 + 本地 REST 服务，数据不出本机。"
+    />
+    <link rel="stylesheet" href="./style.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a84ff'/%3E%3Ctext x='16' y='22' font-family='-apple-system,system-ui' font-size='17' font-weight='700' fill='white' text-anchor='middle'%3EO%3C/text%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <header class="nav">
+      <div class="container nav__inner">
+        <a class="wordmark" href="./index.html">
+          <span class="wordmark__mark">O</span>
+          Oriel
+        </a>
+        <nav class="nav__links">
+          <a href="#features">功能</a>
+          <a href="#shots">界面</a>
+          <a href="./docs.html">文档</a>
+          <a href="https://github.com/Soulmte/Oriel">GitHub</a>
+        </nav>
+        <a class="nav__cta" href="https://github.com/Soulmte/Oriel/releases">下载</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="container">
+          <div class="hero__top">
+            <h1>为 Windows 做的 Finder。</h1>
+            <p class="hero__lede">
+              网格、图标、右键菜单、批量重命名，都按 Finder 的习惯来。
+              界面跑在 Tauri 里，文件操作走本机的 REST 服务，没有一个字节离开这台电脑。
+            </p>
+            <div class="hero__actions">
+              <a class="btn btn--primary" href="https://github.com/Soulmte/Oriel/releases">
+                下载 Windows 版
+              </a>
+              <a class="btn btn--quiet" href="./docs.html">阅读文档</a>
+            </div>
+            <div class="hero__meta">
+              <span><i class="dot"></i>Tauri 2 + Rust 外壳</span>
+              <span><i class="dot"></i>React 19 界面</span>
+              <span><i class="dot"></i>本地 Fastify 服务</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero__shot">
+          <!-- The screenshot already is a window: frame it, don't redraw its chrome. -->
+          <div class="window">
+            <img
+              src="./assets/app-grid.png"
+              alt="Oriel 的网格视图：Word、Excel、PowerPoint、PDF 等文件图标"
+              width="1693"
+              height="1008"
+            />
+          </div>
+          <p class="caption">网格视图 · 397 个扩展名各有自己的图标，Office 与 PDF 用系统真实图标</p>
+        </div>
+      </section>
+
+      <section class="section" id="features">
+        <div class="container">
+          <div class="section__head">
+            <p class="eyebrow">功能</p>
+            <h2>该有的都有，只是按 macOS 的方式做</h2>
+            <p class="section__lede">
+              不是把 Windows 资源管理器换层皮。工具栏、设置、右键菜单、弹窗都按 Finder 和系统设置的形状重画过。
+            </p>
+          </div>
+
+          <div class="grid grid--3">
+            <article class="cell">
+              <h3>图标系统</h3>
+              <p>
+                397 个扩展名、25 个特殊文件名，加上 Office / PDF / 可执行文件的系统图标。
+                列表视图缩到 18px 时角标自动降级成一个字母，不会糊成一团。
+              </p>
+            </article>
+            <article class="cell">
+              <h3>批量重命名</h3>
+              <p>
+                查找替换（可选正则）、编号、添加文本、大小写，四步叠成一个配方。
+                右侧实时预览「原名 → 新名」，重名和非法字符当场标红。
+              </p>
+              <span class="cell__kbd">F2</span>
+            </article>
+            <article class="cell">
+              <h3>归档里也能逛</h3>
+              <p>
+                识别 7-Zip，把 zip / 7z / rar 当成只读目录：
+                可以进子目录、看大小、直接解压某几项，不用先解压整包。
+              </p>
+            </article>
+            <article class="cell">
+              <h3>流式搜索</h3>
+              <p>
+                深度优先遍历，10 秒预算、80 万条目上限，
+                结果通过 SSE 边搜边推，按 Esc 立刻停，不会把磁盘拖垮。
+              </p>
+            </article>
+            <article class="cell">
+              <h3>操作中心</h3>
+              <p>
+                复制、移动、下载都在服务端队列里跑，按字节报进度，
+                可以暂停、继续、重试、取消，失败会删掉半成品。
+              </p>
+            </article>
+            <article class="cell">
+              <h3>外观设置</h3>
+              <p>
+                强调色六选一、界面缩放 90–125%、网格与行高、字体、毛玻璃强度，
+                每个文件夹还各记一份自己的视图与排序。
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section--tight" id="shots">
+        <div class="container split">
+          <div class="split__text">
+            <p class="eyebrow">重命名</p>
+            <h2>改名字不用跟后缀搏斗</h2>
+            <p>
+              重命名弹窗分两栏：左边是文件本身，右边名称和扩展名分开写。
+              批量模式下换成配方式面板，先把计划看完再点应用。
+            </p>
+            <ul class="checks">
+              <li>名称与扩展名两个独立输入框，文件夹不显示后缀行</li>
+              <li>多选后 F2，编号 + 文本 + 大小写一次做完</li>
+              <li>整批校验、两步改名，交换和仅改大小写都安全</li>
+              <li>Ctrl+Z 一次退回整批原名</li>
+            </ul>
+          </div>
+          <div class="shot">
+            <img
+              src="./assets/app-batch.png"
+              alt="批量重命名面板：左侧选项，右侧原名与新名的预览"
+              width="1693"
+              height="1008"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section class="section section--tight">
+        <div class="container split split--flip">
+          <div class="split__text">
+            <p class="eyebrow">设置</p>
+            <h2>按系统设置的形状重画过</h2>
+            <p>
+              左栏分类，右栏分组卡片，行与行之间是发丝线。
+              开关、分段控件、复选框都是自绘的 macOS 控件，开启时整条跑道变成强调色。
+            </p>
+            <ul class="checks">
+              <li>主题、强调色、缩放、字体、毛玻璃</li>
+              <li>右键菜单逐项开关，右边实时预览这一套设置长什么样</li>
+              <li>本地服务状态与一键恢复默认</li>
+            </ul>
+          </div>
+          <div class="shot">
+            <img
+              src="./assets/app-settings.png"
+              alt="设置页：左侧分类导航，右侧分组卡片与蓝色开关"
+              width="1693"
+              height="1008"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section class="section section--tight">
+        <div class="container split">
+          <div class="split__text">
+            <p class="eyebrow">列表</p>
+            <h2>分组、吸顶、文件夹大小</h2>
+            <p>
+              按名称、种类、日期、大小分组，滚动时分组头吸在顶部；
+              大小列会真正去算文件夹的递归体积，进视口才算，不会卡住界面。
+            </p>
+            <ul class="checks">
+              <li>Ctrl / Shift 多选，方向键移动，滚动跟随</li>
+              <li>右键菜单按文件夹 / 文件 / 空白处三套分开配置</li>
+              <li>复制剪切直接写进 Windows 剪贴板，能粘到微信或 QQ</li>
+            </ul>
+          </div>
+          <div class="shot">
+            <img
+              src="./assets/app-list.png"
+              alt="列表视图：分组标题、吸顶表头、大小与种类列"
+              width="1693"
+              height="1008"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="container split split--flip">
+          <div class="split__text">
+            <p class="eyebrow">深色</p>
+            <h2>跟随系统，也可以手动锁定</h2>
+            <p>
+              深色不是把白色反相：分组卡、发丝线、开关、图标阴影都单独调过，
+              强调色和毛玻璃在暗色下仍然清楚。
+            </p>
+          </div>
+          <div class="shot">
+            <img
+              src="./assets/app-grid-dark.png"
+              alt="深色模式下的网格视图"
+              width="1693"
+              height="1008"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section class="section section--tight">
+        <div class="container">
+          <div class="section__head">
+            <p class="eyebrow">怎么搭的</p>
+            <h2>桌面外壳 + 本地服务，界面只管画</h2>
+            <p class="section__lede">
+              Rust 负责窗口、系统菜单、属性对话框这些必须原生的事情；
+              文件读写、搜索、压缩、缩略图都在本机 8787 的 Fastify 服务里，
+              界面通过 REST 和 SSE 跟它说话。所以同一份界面也能在浏览器里跑。
+            </p>
+            <div class="stack">
+              <span class="chip">Tauri 2</span>
+              <span class="chip">Rust · windows-rs</span>
+              <span class="chip">React 19</span>
+              <span class="chip">TypeScript</span>
+              <span class="chip">Fastify</span>
+              <span class="chip">7-Zip CLI</span>
+              <span class="chip">sharp</span>
+              <span class="chip">SSE</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="end">
+        <div class="container">
+          <h2>先装上，再决定要不要换掉资源管理器</h2>
+          <p>Windows 10 / 11，安装包在 GitHub Releases，源码同一仓库。</p>
+          <div class="end__actions">
+            <a class="btn btn--primary" href="https://github.com/Soulmte/Oriel/releases">
+              下载安装包
+            </a>
+            <a class="btn btn--quiet" href="./docs.html">看文档</a>
+            <a class="btn btn--quiet" href="https://github.com/Soulmte/Oriel">看源码</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer__inner">
+        <span>Oriel</span>
+        <a href="https://github.com/Soulmte/Oriel/blob/main/README.md">README</a>
+        <a href="./docs.html">文档</a>
+        <a href="https://github.com/Soulmte/Oriel/issues">反馈</a>
+        <span class="footer__spacer"
+          >安装包未签名，首次运行需要在 SmartScreen 里选择「仍要运行」</span
+        >
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,5 +1,9 @@
 # Oriel
 
+> 想直接看介绍？落地页在 [`site/index.html`](site/index.html)，项目文档在
+> [`site/docs.html`](site/docs.html)；推送到 `main` 后由 GitHub Pages 自动发布
+> （`Settings → Pages → Source: GitHub Actions`）。
+
 > 一个跑在 Windows 上的 Finder 风格文件管理器 —— Tauri 2 + React 19 + 本地 Fastify 服务。
 
 一个跑在 Windows 上的、macOS Finder 风格的资源管理器基座。
