@@ -52,15 +52,32 @@ jobs:
           generate_release_notes: true
 
   # Optional: mirror the repository to Gitee (configure the GITEE_TOKEN secret).
+  # `secrets` is not allowed in a job-level `if`, and using it there made the
+  # whole workflow invalid -> a failed run on every push. Probe it in a step.
   mirror:
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ secrets.GITEE_TOKEN != '' }}
     steps:
+      - name: Check for a Gitee token
+        id: token
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          if [ -n "$GITEE_TOKEN" ]; then
+            echo "present=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=no" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.token.outputs.present == 'yes'
         with:
           fetch-depth: 0
+
       - name: Push to Gitee
+        if: steps.token.outputs.present == 'yes'
+        env:
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
         run: |
-          git remote add gitee "https://oauth2:${{ secrets.GITEE_TOKEN }}@gitee.com/${{ github.repository_owner }}/Oriel.git"
+          git remote add gitee "https://oauth2:${GITEE_TOKEN}@gitee.com/${{ github.repository_owner }}/Oriel.git"
           git push gitee "refs/remotes/origin/*:refs/heads/*" --tags --force
