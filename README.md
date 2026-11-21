@@ -1,5 +1,7 @@
 # Oriel
 
+> **下载**：<https://github.com/Soulmte/Oriel/releases/latest>（NSIS 安装包 / MSI / 服务端 zip）
+>
 > **线上站点**：<https://soulmte.github.io/Oriel/>（落地页）·
 > <https://soulmte.github.io/Oriel/docs.html>（项目文档）
 >
