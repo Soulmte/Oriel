@@ -264,12 +264,15 @@ export function PopupMenu({
   items,
   onClose,
   minWidth = 208,
+  zIndex = 100,
 }: {
   x: number;
   y: number;
   items: MenuItem[];
   onClose: () => void;
   minWidth?: number;
+  /** Raise it above a modal: HeroUI's backdrop sits at 100000. */
+  zIndex?: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x, y });
@@ -324,9 +327,10 @@ export function PopupMenu({
         top: position.y,
         minWidth,
         maxHeight: `calc(100vh - ${VIEWPORT_PADDING * 2}px)`,
+        zIndex,
       }}
       className={clsx(
-        "animate-fade-in fixed z-[100] overflow-y-auto",
+        "animate-fade-in fixed overflow-y-auto",
         MENU_SURFACE_CLASS,
       )}
     >
