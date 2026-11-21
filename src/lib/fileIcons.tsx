@@ -1152,18 +1152,22 @@ function ShellIcon({
       >
         {fallback}
       </span>
+      {/* Shell icons come trimmed to their own bounds, so drawing them at the
+          full box makes Office/PDF look a size larger than the generated pages.
+          Scaling to the page width keeps every icon the same visual weight. */}
       <img
         ref={imgRef}
         src={src}
-        width={size}
-        height={size}
+        width={Math.round(size * 0.86)}
+        height={Math.round(size * 0.86)}
         alt=""
         draggable={false}
         onLoad={() => setLoaded(true)}
         className={clsx(
-          "relative size-full object-contain transition-opacity duration-150",
+          "relative object-contain transition-opacity duration-150",
           loaded ? "opacity-100" : "opacity-0",
         )}
+        style={{ width: Math.round(size * 0.86), height: Math.round(size * 0.86) }}
       />
     </span>
   );
