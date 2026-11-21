@@ -159,6 +159,11 @@ export function useShortcuts() {
       }
 
       if (event.key === "F2") {
+        if (state.selected.length > 1) {
+          event.preventDefault();
+          state.openDialog({ kind: "batch-rename", paths: [...state.selected] });
+          return;
+        }
         const entry = findEntry(state.selected[0]);
         if (entry) {
           event.preventDefault();

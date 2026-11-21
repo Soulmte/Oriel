@@ -22,6 +22,7 @@ import {
 } from "@oriel/shared";
 import { ApiError, fromFsError } from "../errors.js";
 import {
+  batchRenameEntries,
   copyEntries,
   createDownloadStream,
   createFile,
@@ -731,6 +732,38 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
     const newName = validateEntryName(body.newName ?? body.name);
     const renamed = await renameEntry(target, newName);
     return { path: renamed };
+  });
+
+  app.post("/fs/batch-rename", async (request) => {
+    const body = (request.body ?? {}) as Body & {
+      items?: Array<{ path?: unknown; name?: unknown }>;
+    };
+    const raw = Array.isArray(body.items) ? body.items : [];
+    if (raw.length === 0) {
+      throw ApiError.badRequest(ERROR_CODES.invalidName, "没有要重命名的项目");
+    }
+    if (raw.length > 5000) {
+      throw ApiError.badRequest(ERROR_CODES.invalidName, "一次最多重命名 5000 项");
+    }
+
+    // Validate the whole batch before touching the disk: a rejected item must
+    // leave every other file as it was.
+    const items = raw.map((item, index) => {
+      assertNotArchive(item?.path);
+      const target = normalizePath(item?.path);
+      assertWritable(target);
+      try {
+        return { path: target, name: validateEntryName(item?.name) };
+      } catch (error) {
+        if (error instanceof ApiError) {
+          throw ApiError.badRequest(error.code, `第 ${index + 1} 项：${error.message}`);
+        }
+        throw error;
+      }
+    });
+
+    const renamed = await batchRenameEntries(items);
+    return { renamed };
   });
 
   app.post("/fs/copy", async (request) => {

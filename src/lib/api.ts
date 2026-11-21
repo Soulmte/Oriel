@@ -171,6 +171,12 @@ export const api = {
   rename: (path: string, newName: string) =>
     post<{ path: string }>("/fs/rename", { path, newName }),
 
+  /** Renames many entries at once; the server runs them through temp names. */
+  batchRename: (items: Array<{ path: string; name: string }>) =>
+    post<{ renamed: Array<{ from: string; to: string }> }>("/fs/batch-rename", {
+      items,
+    }),
+
   copy: (sources: string[], target: string) =>
     post<{ paths: string[] }>("/fs/copy", { sources, target }),
 

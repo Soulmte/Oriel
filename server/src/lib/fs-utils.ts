@@ -2,6 +2,7 @@ import type { Dirent } from "node:fs";
 import path from "node:path";
 import type { EntryDto, PreviewResponse } from "@oriel/shared";
 import {
+  ERROR_CODES,
   PREVIEW_BYTE_LIMIT,
   SEARCH_BUDGET_MS,
   SEARCH_RESULT_LIMIT,
@@ -532,6 +533,86 @@ export async function renameEntry(
     throw fromFsError(error, destination);
   }
   return destination;
+}
+
+/**
+ * Renames many entries in one shot.
+ *
+ * Everything is validated before a single file is touched, because a half
+ * applied batch is worse than a refused one. The moves then go through a
+ * temporary name: that is what makes `a.txt → b.txt, b.txt → a.txt` and the
+ * case-only `readme.md → README.md` work on a case-insensitive volume.
+ */
+export async function batchRenameEntries(
+  items: Array<{ path: string; name: string }>,
+): Promise<Array<{ from: string; to: string }>> {
+  if (items.length === 0) {
+    throw ApiError.badRequest(ERROR_CODES.invalidName, "没有要重命名的项目");
+  }
+
+  const sources = new Set(items.map((item) => item.path.toLowerCase()));
+  const seen = new Map<string, string>();
+  const moves: Array<{ from: string; to: string }> = [];
+
+  for (const item of items) {
+    const target = path.resolve(item.path);
+    const destination = path.join(path.dirname(target), item.name);
+    // A pure case change (readme.md -> README.md) is "the same path" to
+    // isSamePath but still needs the two-phase rename, so only skip when the
+    // name is byte-identical.
+    if (path.basename(target) === item.name) continue;
+
+    const key = destination.toLowerCase();
+    const clash = seen.get(key);
+    if (clash) {
+      throw ApiError.conflict(
+        `“${item.name}” 出现了两次，重命名后会互相覆盖`,
+      );
+    }
+    seen.set(key, target);
+
+    await statOrThrow(target);
+    // A destination that is one of the *sources* is fine: it is about to move
+    // out of the way in the first phase.
+    if (!sources.has(key) && (await pathExists(destination))) {
+      throw ApiError.conflict(`“${item.name}” 已存在`);
+    }
+
+    moves.push({ from: target, to: destination });
+  }
+
+  if (moves.length === 0) return [];
+
+  const staged: Array<{ temp: string; from: string; to: string }> = [];
+  const moved: Array<{ from: string; to: string }> = [];
+  const token = `${process.pid}-${Date.now().toString(36)}`;
+
+  try {
+    for (const [index, move] of moves.entries()) {
+      const temp = path.join(
+        path.dirname(move.from),
+        `.macexplorer-rename-${token}-${index}`,
+      );
+      await fs.rename(move.from, temp);
+      staged.push({ temp, from: move.from, to: move.to });
+    }
+
+    for (const item of staged) {
+      await fs.rename(item.temp, item.to);
+      moved.push({ from: item.temp, to: item.to });
+    }
+  } catch (error) {
+    // Put everything back: the finalised ones first, then the staged ones.
+    for (const item of moved.reverse()) {
+      await fs.rename(item.to, item.from).catch(() => {});
+    }
+    for (const item of staged) {
+      await fs.rename(item.temp, item.from).catch(() => {});
+    }
+    throw fromFsError(error, moves[0]?.to ?? "");
+  }
+
+  return moves;
 }
 
 export async function copyEntries(

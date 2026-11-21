@@ -32,7 +32,9 @@ export function Dialogs() {
     setBusy(false);
   }, [dialog]);
 
-  const isOpen = dialog !== null;
+  // The batch rename dialog is its own modal; keeping this one closed avoids
+  // two backdrops fighting over the focus trap.
+  const isOpen = dialog !== null && dialog.kind !== "batch-rename";
   const errorDialog = dialog?.kind === "error" ? dialog : null;
   const conflictDialog = dialog?.kind === "conflict" ? dialog : null;
   const removeDialog = dialog?.kind === "confirm-remove" ? dialog : null;

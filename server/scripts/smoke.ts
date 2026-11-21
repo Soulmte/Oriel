@@ -121,6 +121,81 @@ try {
   });
   record("mkdir", mkdir.statusCode === 200, `HTTP ${mkdir.statusCode}`);
 
+  // Batch rename: a swap only works when the moves go through temp names.
+  const gamma = path.join(workdir, "gamma");
+  await fs.writeFile(path.join(gamma, "a.txt"), "A", "utf8");
+  await fs.writeFile(path.join(gamma, "b.txt"), "B", "utf8");
+  await fs.writeFile(path.join(gamma, "c.txt"), "C", "utf8");
+
+  const swap = await app.inject({
+    method: "POST",
+    url: "/api/fs/batch-rename",
+    payload: {
+      items: [
+        { path: path.join(gamma, "a.txt"), name: "b.txt" },
+        { path: path.join(gamma, "b.txt"), name: "a.txt" },
+        { path: path.join(gamma, "c.txt"), name: "c-01.txt" },
+      ],
+    },
+  });
+  const swapped =
+    swap.statusCode === 200 &&
+    (await fs.readFile(path.join(gamma, "b.txt"), "utf8")) === "A" &&
+    (await fs.readFile(path.join(gamma, "a.txt"), "utf8")) === "B" &&
+    (await fs.stat(path.join(gamma, "c-01.txt")).then(() => true).catch(() => false));
+  record("batch rename swap", swapped, `HTTP ${swap.statusCode}`);
+
+  const duplicate = await app.inject({
+    method: "POST",
+    url: "/api/fs/batch-rename",
+    payload: {
+      items: [
+        { path: path.join(gamma, "a.txt"), name: "same.txt" },
+        { path: path.join(gamma, "b.txt"), name: "same.txt" },
+      ],
+    },
+  });
+  const untouched =
+    (await fs.readFile(path.join(gamma, "a.txt"), "utf8")) === "B";
+  record(
+    "batch rename rejects duplicates",
+    duplicate.statusCode === 409 && untouched,
+    `HTTP ${duplicate.statusCode} (expected 409)`,
+  );
+
+  const invalid = await app.inject({
+    method: "POST",
+    url: "/api/fs/batch-rename",
+    payload: {
+      items: [
+        { path: path.join(gamma, "a.txt"), name: "ok.txt" },
+        { path: path.join(gamma, "b.txt"), name: "bad:name.txt" },
+      ],
+    },
+  });
+  record(
+    "batch rename is all-or-nothing",
+    invalid.statusCode === 400 &&
+      (await fs.readFile(path.join(gamma, "a.txt"), "utf8")) === "B",
+    `HTTP ${invalid.statusCode} (expected 400)`,
+  );
+
+  if (process.platform === "win32") {
+    const recase = await app.inject({
+      method: "POST",
+      url: "/api/fs/batch-rename",
+      payload: {
+        items: [{ path: path.join(gamma, "a.txt"), name: "A.txt" }],
+      },
+    });
+    const names = await fs.readdir(gamma).catch(() => [] as string[]);
+    record(
+      "batch rename case-only",
+      recase.statusCode === 200 && names.includes("A.txt"),
+      `HTTP ${recase.statusCode}`,
+    );
+  }
+
   const remove = await app.inject({
     method: "POST",
     url: "/api/fs/delete",

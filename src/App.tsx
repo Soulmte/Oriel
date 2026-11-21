@@ -13,6 +13,7 @@ import { PreviewPanel } from "./components/PreviewPanel";
 import { StatusBar } from "./components/StatusBar";
 import { ContextMenuLayer } from "./components/ContextMenuLayer";
 import { Dialogs } from "./components/Dialogs";
+import { BatchRenameDialog } from "./components/BatchRenameDialog";
 import { SettingsPage } from "./components/SettingsPage";
 import { RecycleBin } from "./components/RecycleBin";
 import { OperationsPanel } from "./components/OperationsPanel";
@@ -65,6 +66,7 @@ function ExplorerShell() {
       <OperationsPanel />
       <ContextMenuLayer />
       <Dialogs />
+      <BatchRenameDialog />
     </div>
   );
 }

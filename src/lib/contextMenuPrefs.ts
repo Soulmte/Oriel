@@ -47,6 +47,7 @@ export const BUILTIN_MENU_ITEMS: Array<{
   { id: "paste-into", label: "粘贴到此文件夹", scope: "folder" },
   { id: "copy-path", label: "复制路径", scope: "entry" },
   { id: "rename", label: "重命名", scope: "entry" },
+  { id: "rename-batch", label: "批量重命名…", scope: "entry" },
   { id: "reveal", label: "在资源管理器中显示", scope: "entry" },
   { id: "trash", label: "移到废纸篓", scope: "entry" },
   { id: "delete", label: "永久删除", scope: "entry" },

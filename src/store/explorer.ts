@@ -59,6 +59,7 @@ export type DialogState =
   | { kind: "new-folder" }
   | { kind: "new-file"; extension: string; label: string; content: string }
   | { kind: "rename"; entry: EntryDto }
+  | { kind: "batch-rename"; paths: string[] }
   | { kind: "error"; message: string }
   | { kind: "confirm-remove"; paths: string[]; permanent: boolean }
   | { kind: "confirm-purge"; ids: string[]; all: boolean }
@@ -274,6 +275,8 @@ interface ExplorerState {
   createFile: (name: string, content?: string) => Promise<boolean>;
   openTerminal: () => Promise<void>;
   renameEntry: (name: string) => Promise<boolean>;
+  /** Applies an already-previewed batch rename (paths + final names). */
+  batchRename: (items: Array<{ path: string; name: string }>) => Promise<boolean>;
   removePaths: (paths: string[], permanent?: boolean) => Promise<void>;
   /** Performs the delete after the confirmation dialog was accepted. */
   performRemove: (paths: string[], permanent: boolean) => Promise<void>;
@@ -1767,6 +1770,35 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
         },
       });
       get().notify("已重命名");
+      return true;
+    } catch (error) {
+      set({ dialog: { kind: "error", message: errorMessage(error) } });
+      return false;
+    }
+  },
+
+  async batchRename(items) {
+    if (items.length === 0) return false;
+
+    try {
+      const { renamed } = await api.batchRename(items);
+      await get().reload();
+      const paths = renamed.map((item) => item.to);
+      set({ selected: paths, anchor: paths[0] ?? null });
+      if (renamed.length > 0) {
+        get().pushUndo({
+          label: `批量重命名 ${renamed.length} 项`,
+          run: async () => {
+            await api.batchRename(
+              renamed.map((item) => ({
+                path: item.to,
+                name: basename(item.from),
+              })),
+            );
+          },
+        });
+      }
+      get().notify(`已重命名 ${renamed.length} 项`);
       return true;
     } catch (error) {
       set({ dialog: { kind: "error", message: errorMessage(error) } });

@@ -272,13 +272,27 @@ export function ContextMenuLayer() {
             } as MenuItem,
           ]
         : []),
-      {
-        id: "rename",
-        label: "重命名",
-        icon: <Pencil className="size-3.5" />,
-        shortcut: "F2",
-        onSelect: () => openDialog({ kind: "rename", entry }),
-      },
+      // Right-clicking inside a multi-selection renames the whole selection.
+      ...(selected.length > 1 && selected.includes(entry.path)
+        ? [
+            {
+              id: "rename-batch",
+              label: `批量重命名 ${selected.length} 项…`,
+              icon: <Pencil className="size-3.5" />,
+              shortcut: "F2",
+              disabled: selected.some((item) => isArchivePath(item)),
+              onSelect: () => openDialog({ kind: "batch-rename", paths: [...selected] }),
+            } as MenuItem,
+          ]
+        : [
+            {
+              id: "rename",
+              label: "重命名",
+              icon: <Pencil className="size-3.5" />,
+              shortcut: "F2",
+              onSelect: () => openDialog({ kind: "rename", entry }),
+            } as MenuItem,
+          ]),
       { id: "sep-2", separator: true },
       {
         id: "reveal",
