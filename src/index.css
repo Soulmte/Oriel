@@ -147,6 +147,21 @@ html[data-motion="reduced"] *::after {
   }
 }
 
+/*
+ * Alert sheets should feel instant. The library animates the modal container
+ * for 250ms with a 1.05 scale, which reads as slow on a 380px dialog.
+ */
+@keyframes mac-sheet-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes toast-rise {
   from {
     opacity: 0;
@@ -159,6 +174,22 @@ html[data-motion="reduced"] *::after {
 }
 
 @layer components {
+  /* The library also ships a higher-specificity animation-name rule for the
+     placement variants, so this one has to win outright. */
+  .modal__container[data-entering="true"],
+  .modal__container[data-entering="true"][data-placement] {
+    animation: mac-sheet-in 120ms cubic-bezier(0.32, 0.72, 0, 1) both !important;
+  }
+
+  .modal__backdrop[data-entering="true"] {
+    animation-duration: 100ms;
+  }
+
+  .modal__backdrop[data-exiting="true"],
+  .modal__container[data-exiting="true"] {
+    animation-duration: 80ms;
+  }
+
   /* One entrance for the floating notice; nothing else moves on load. */
   .toast-in {
     animation: toast-rise 160ms cubic-bezier(0.32, 0.72, 0, 1) both;
