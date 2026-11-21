@@ -57,7 +57,7 @@ import type { AppearancePrefs } from "../lib/appearance";
 
 export type DialogState =
   | { kind: "new-folder" }
-  | { kind: "new-file" }
+  | { kind: "new-file"; extension: string; label: string; content: string }
   | { kind: "rename"; entry: EntryDto }
   | { kind: "error"; message: string }
   | { kind: "confirm-remove"; paths: string[]; permanent: boolean }
@@ -271,7 +271,7 @@ interface ExplorerState {
   closeDialog: () => void;
 
   createFolder: (name: string) => Promise<boolean>;
-  createFile: (name: string) => Promise<boolean>;
+  createFile: (name: string, content?: string) => Promise<boolean>;
   openTerminal: () => Promise<void>;
   renameEntry: (name: string) => Promise<boolean>;
   removePaths: (paths: string[], permanent?: boolean) => Promise<void>;
@@ -1716,14 +1716,14 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
     }
   },
 
-  async createFile(name) {
+  async createFile(name, content = "") {
     const { path } = get();
     if (isArchivePath(path)) {
       get().notify("归档内容只读，请先解压到文件夹");
       return false;
     }
     try {
-      const created = await api.newFile(path, name);
+      const created = await api.newFile(path, name, content);
       await get().reload();
       set({ selected: [created.path], anchor: created.path });
       get().notify("已新建文件");

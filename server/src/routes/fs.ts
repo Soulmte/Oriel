@@ -703,7 +703,13 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
     const target = normalizePath(body.path);
     assertWritable(target);
     const name = validateEntryName(body.name);
-    const created = await createFile(target, name);
+    const raw = typeof body.content === "string" ? body.content : "";
+    // Seeded content is a convenience (an empty JSON object, a heading…), so it
+    // stays small: this endpoint is not a write API.
+    if (raw.length > 64 * 1024) {
+      throw ApiError.badRequest("INVALID_BODY", "初始内容过大");
+    }
+    const created = await createFile(target, name, raw);
     return { path: created };
   });
 

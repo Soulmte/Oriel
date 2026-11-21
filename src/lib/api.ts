@@ -163,8 +163,8 @@ export const api = {
   mkdir: (path: string, name: string) =>
     post<{ path: string }>("/fs/mkdir", { path, name }),
 
-  newFile: (path: string, name: string) =>
-    post<{ path: string }>("/fs/new-file", { path, name }),
+  newFile: (path: string, name: string, content = "") =>
+    post<{ path: string }>("/fs/new-file", { path, name, content }),
 
   openTerminal: (path: string) => post<{ ok: true }>("/fs/terminal", { path }),
 

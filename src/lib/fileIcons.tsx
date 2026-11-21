@@ -652,6 +652,37 @@ const moreExtVisuals: Record<string, FileVisual> = {
   kmz: doc("KMZ", "#4a8f5c"),
 };
 
+/** Compact badge text for the "new file" menu (uppercase, <=4 chars). */
+const BADGE_LABELS: Record<string, string> = {
+  txt: "TXT",
+  md: "MD",
+  mdx: "MDX",
+  ts: "TS",
+  tsx: "TSX",
+  js: "JS",
+  jsx: "JSX",
+  json: "JSON",
+  jsonc: "JSON",
+  html: "HTML",
+  htm: "HTML",
+  css: "CSS",
+  scss: "SCSS",
+  py: "PY",
+  rs: "RS",
+  go: "GO",
+  java: "JAVA",
+  sh: "SH",
+  ps1: "PS1",
+  yml: "YML",
+  yaml: "YAML",
+  toml: "TOML",
+  xml: "XML",
+  csv: "CSV",
+  sql: "SQL",
+  bat: "BAT",
+  ini: "INI",
+};
+
 const FALLBACK_BADGES = [
   "#6f7278",
   "#5d7f9e",
@@ -688,6 +719,35 @@ function visualFor(entry: EntryDto): FileVisual {
 }
 
 /**
+ * Page + letter badge for *any* extension, even the ones that normally use a
+ * brand logo. The toolbar's "新建" menu uses this so a new .ts/.json file looks
+ * like the file it creates instead of a generic document.
+ */
+export function formatBadgeVisual(ext: string): FileVisual {
+  const key = ext.toLowerCase();
+  const known = extVisuals[key] ?? moreExtVisuals[key];
+  const label = BADGE_LABELS[key] ?? key.toUpperCase().slice(0, 4);
+
+  const background =
+    known?.kind === "page"
+      ? known.background
+      : known?.kind === "brand"
+        ? known.color
+        : known?.kind === "glyph"
+          ? known.color
+          : (FALLBACK_BADGES[key.length % FALLBACK_BADGES.length] as string);
+
+  return { kind: "page", background, content: { kind: "label", text: label } };
+}
+
+/** Menu-sized icon for a file type, matching the listing's design. */
+export function FormatIcon({ ext, size = 18 }: { ext: string; size?: number }) {
+  const visual = formatBadgeVisual(ext);
+  if (visual.kind !== "page") return null;
+  return <PageIcon visual={visual} size={size} />;
+}
+
+/**
  * Thumbnail URL for image entries, or `undefined` when the entry should keep
  * its generated icon. Kept as a helper so grid and list agree on the rule.
  */
@@ -695,6 +755,22 @@ export function thumbnailFor(entry: EntryDto, size = 160): string | undefined {
   if (entry.kind !== "file") return undefined;
   if (!THUMBNAIL_EXTENSIONS.has(entry.ext)) return undefined;
   return api.thumbnailUrl(entry.path, entry.mtimeMs, size);
+}
+
+/**
+ * Badge label colour: white on dark badges (Word blue), near-black on light
+ * ones (JavaScript yellow) — otherwise the letters wash out.
+ */
+function contrastText(background: string): string {
+  const match = /^#?([0-9a-f]{6})$/i.exec(background);
+  if (!match) return "#ffffff";
+  const value = Number.parseInt(match[1] as string, 16);
+  const luminance =
+    (0.2126 * ((value >> 16) & 0xff) +
+      0.7152 * ((value >> 8) & 0xff) +
+      0.0722 * (value & 0xff)) /
+    255;
+  return luminance > 0.62 ? "#1b1b1d" : "#ffffff";
 }
 
 /** White page + folded corner + faint content lines + coloured badge. */
@@ -764,12 +840,21 @@ function PageIcon({
         }}
       />
 
-      {/* Badge — Office places it vertically centred on the left edge */}
+      {/* Badge — Office places it vertically centred on the left edge. Wide
+          labels (JSON, HTML) get a wider badge so the letters stay readable. */}
       <span
         className="absolute left-0 grid place-items-center"
         style={{
           top: Math.round((size - badge) / 2),
-          width: badge,
+          width:
+            visual.content.kind === "label"
+              ? badge *
+                (visual.content.text.length <= 2
+                  ? 1
+                  : visual.content.text.length === 3
+                    ? 1.2
+                    : 1.42)
+              : badge,
           height: badge,
           borderRadius: Math.max(3, Math.round(size * 0.13)),
           background: visual.background,
@@ -780,19 +865,23 @@ function PageIcon({
           <visual.content.Icon
             size={Math.round(badge * 0.6)}
             aria-hidden="true"
-            className="text-white"
+            style={{ color: contrastText(visual.background) }}
           />
         ) : (
           <span
-            className="font-semibold leading-none text-white"
+            className="font-semibold leading-none"
             style={{
+              color: contrastText(visual.background),
               fontSize:
                 visual.content.text.length === 1
                   ? badge * 0.58
                   : visual.content.text.length === 2
                     ? badge * 0.44
-                    : badge * 0.31,
-              letterSpacing: visual.content.text.length >= 3 ? "-0.04em" : "-0.02em",
+                    : visual.content.text.length === 3
+                      ? badge * 0.34
+                      : badge * 0.3,
+              letterSpacing:
+                visual.content.text.length >= 3 ? "-0.03em" : "-0.02em",
             }}
           >
             {visual.content.text}

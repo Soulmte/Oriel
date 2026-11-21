@@ -23,7 +23,7 @@ export function Dialogs() {
     if (dialog?.kind === "new-folder") {
       setValue("未命名文件夹");
     } else if (dialog?.kind === "new-file") {
-      setValue("新建文本文档.txt");
+      setValue(`新建 ${dialog.label}.${dialog.extension}`);
     } else if (dialog?.kind === "rename") {
       setValue(dialog.entry.name);
     } else {
@@ -57,7 +57,7 @@ export function Dialogs() {
       dialog.kind === "new-folder"
         ? await createFolder(trimmed)
         : dialog.kind === "new-file"
-          ? await createFile(trimmed)
+          ? await createFile(trimmed, dialog.content)
           : await renameEntry(trimmed);
     setBusy(false);
 
@@ -241,7 +241,7 @@ export function Dialogs() {
                   {dialog?.kind === "rename"
                     ? "重命名"
                     : dialog?.kind === "new-file"
-                      ? "新建文本文档"
+                      ? `新建${dialog.label}`
                       : "新建文件夹"}
                 </Modal.Heading>
               </Modal.Header>

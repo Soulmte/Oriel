@@ -459,8 +459,12 @@ export async function createFolder(parentPath: string, name: string): Promise<st
   return destination;
 }
 
-/** Creates an empty file; "new text document" from the toolbar. */
-export async function createFile(parentPath: string, name: string): Promise<string> {
+/** Creates a file, optionally seeded with a template (JSON, Markdown…). */
+export async function createFile(
+  parentPath: string,
+  name: string,
+  content = "",
+): Promise<string> {
   const parentStat = await statOrThrow(parentPath);
   if (!parentStat.isDirectory()) {
     throw ApiError.badRequest("NOT_A_DIRECTORY", "目标不是文件夹");
@@ -472,7 +476,7 @@ export async function createFile(parentPath: string, name: string): Promise<stri
   }
 
   try {
-    await fs.writeFile(destination, "", { flag: "wx" });
+    await fs.writeFile(destination, content, { flag: "wx" });
   } catch (error) {
     throw fromFsError(error, destination);
   }

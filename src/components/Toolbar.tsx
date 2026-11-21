@@ -21,7 +21,6 @@ import {
   SFChevronRight,
   SFChevronUp,
   SFEllipsis,
-  SFDocumentBadgePlus,
   SFEye,
   SFFolderBadgePlus,
   SFGearshapeFill,
@@ -35,11 +34,36 @@ import {
   SFAppleTerminal,
 } from "sf-symbols-lib/dualtone";
 import { Loader2 } from "lucide-react";
+import { FormatIcon } from "../lib/fileIcons";
 import type { SortKey, ViewMode } from "@oriel/shared";
 import { useExplorer } from "../store/explorer";
 import { GROUP_LABELS } from "../lib/grouping";
 import type { GroupKey } from "../lib/grouping";
 import { DENSITY_LABELS, GRID_SIZE_LABELS } from "../lib/appearance";
+
+/**
+ * Common formats offered by 新建. Each entry renders with the same page+badge
+ * icon the listing uses, so the menu previews exactly what it creates.
+ */
+const NEW_FILE_TYPES: Array<{
+  extension: string;
+  label: string;
+  content: string;
+  hint?: string;
+}> = [
+  { extension: "txt", label: "文本文档", content: "" },
+  { extension: "md", label: "Markdown", content: "# 标题\n\n" },
+  { extension: "ts", label: "TypeScript", content: "export {};\n" },
+  { extension: "js", label: "JavaScript", content: "" },
+  { extension: "tsx", label: "React 组件", content: "export function Component() {\n  return null;\n}\n" },
+  { extension: "json", label: "JSON", content: "{\n  \n}\n" },
+  { extension: "html", label: "HTML", content: "<!doctype html>\n<html lang=\"zh-CN\">\n  <head>\n    <meta charset=\"utf-8\" />\n    <title>Document</title>\n  </head>\n  <body></body>\n</html>\n" },
+  { extension: "css", label: "CSS", content: "" },
+  { extension: "py", label: "Python", content: "" },
+  { extension: "yml", label: "YAML", content: "" },
+  { extension: "sh", label: "Shell 脚本", content: "#!/usr/bin/env bash\n\n" },
+  { extension: "bat", label: "批处理", content: "@echo off\r\n" },
+];
 
 const SORT_LABELS: Record<SortKey, string> = {
   name: "名称",
@@ -362,23 +386,45 @@ export function Toolbar() {
           <SFPlus size={16} />
           {showLabels && <span>新建</span>}
         </Button>
-        <Dropdown.Popover placement="bottom start" className="min-w-[216px]">
+        <Dropdown.Popover placement="bottom start" className="w-[268px]">
           <Dropdown.Menu
             onAction={(key) => {
-              if (String(key) === "folder") openDialog({ kind: "new-folder" });
-              else openDialog({ kind: "new-file" });
+              const value = String(key);
+              if (value === "folder") {
+                openDialog({ kind: "new-folder" });
+                return;
+              }
+              const type = NEW_FILE_TYPES.find((item) => item.extension === value);
+              if (!type) return;
+              openDialog({
+                kind: "new-file",
+                extension: type.extension,
+                label: type.label,
+                content: type.content,
+              });
             }}
           >
             <Dropdown.Item id="folder" textValue="新建文件夹">
-              <SFFolderBadgePlus size={14} className="shrink-0 text-muted" />
+              <SFFolderBadgePlus size={16} className="shrink-0 text-muted" />
               <Label>新建文件夹</Label>
               <span className="ml-auto text-[11px] text-muted">Ctrl+Shift+N</span>
             </Dropdown.Item>
-            <Dropdown.Item id="file" textValue="新建文本文档">
-              <SFDocumentBadgePlus size={14} className="shrink-0 text-muted" />
-              <Label>新建文本文档</Label>
-              <span className="ml-auto text-[11px] text-muted">.txt</span>
-            </Dropdown.Item>
+            <Separator />
+            {NEW_FILE_TYPES.map((type) => (
+              <Dropdown.Item
+                key={type.extension}
+                id={type.extension}
+                textValue={`${type.label} .${type.extension}`}
+              >
+                <span className="grid size-5 shrink-0 place-items-center">
+                  <FormatIcon ext={type.extension} size={20} />
+                </span>
+                <Label>{type.label}</Label>
+                <span className="ml-auto text-[11px] text-muted">
+                  .{type.extension}
+                </span>
+              </Dropdown.Item>
+            ))}
           </Dropdown.Menu>
         </Dropdown.Popover>
       </Dropdown>
