@@ -13,7 +13,8 @@ import type { Key } from "@heroui/react";
 import type { ReactNode } from "react";
 import {
   SFArrowClockwise,
-  SFArrowUpArrowDown,
+  SFArrowDown,
+  SFArrowUp,
   SFArrowUpRightSquare,
   SFCheckmark,
   SFChevronDown,
@@ -97,6 +98,7 @@ function IconButton({
         aria-label={label}
         isDisabled={disabled}
         onPress={onPress}
+        className={TOOL_ICON_CLASS}
       >
         {children}
       </Button>
@@ -108,11 +110,24 @@ function IconButton({
   );
 }
 
-const SEGMENT_CLASS =
-  "size-6 min-w-6 rounded-[5px] border-0 bg-transparent px-0 text-mac-muted data-[hovered=true]:bg-black/[0.04] data-[hovered=true]:text-mac-text data-[selected=true]:bg-mac-surface data-[selected=true]:text-mac-text data-[selected=true]:shadow-sm dark:data-[hovered=true]:bg-white/10";
+/** macOS toolbar button: 28px hit area, 6px radius, quiet hover. */
+const TOOL_ICON_CLASS =
+  "size-7 min-w-7 shrink-0 rounded-[6px] border-0 bg-transparent p-0 text-mac-text/75 " +
+  "data-[hovered=true]:bg-black/[0.06] data-[hovered=true]:text-mac-text " +
+  "data-[pressed=true]:bg-black/[0.1] " +
+  "data-[disabled=true]:opacity-35 dark:data-[hovered=true]:bg-white/10 dark:data-[pressed=true]:bg-white/15";
 
+const SEGMENT_CLASS =
+  "size-6 min-w-6 rounded-[5px] border-0 bg-transparent px-0 text-mac-text/70 " +
+  "data-[hovered=true]:text-mac-text data-[selected=true]:bg-mac-surface data-[selected=true]:text-mac-text " +
+  "data-[selected=true]:shadow-[0_1px_2px_rgba(0,0,0,0.16)] " +
+  "dark:data-[selected=true]:bg-white/[0.18] dark:data-[selected=true]:shadow-[0_1px_2px_rgba(0,0,0,0.4)]";
+
+/** Popup button: icon + optional label + chevron, no chrome until hover. */
 const TOOL_BUTTON_CLASS =
-  "gap-1.5 px-2 text-[12.5px] text-mac-muted";
+  "h-7 gap-1.5 rounded-[6px] border-0 bg-transparent px-2 text-[12.5px] text-mac-text/80 " +
+  "data-[hovered=true]:bg-black/[0.06] data-[hovered=true]:text-mac-text " +
+  "data-[pressed=true]:bg-black/[0.1] dark:data-[hovered=true]:bg-white/10";
 
 export function Toolbar() {
   const history = useExplorer((state) => state.history);
@@ -222,7 +237,7 @@ export function Toolbar() {
     <div
       ref={bar}
       data-toolbar
-      className="flex h-12 shrink-0 items-center gap-1 overflow-hidden border-b border-mac-line bg-mac-chrome/60 px-4 backdrop-blur-xl"
+      className="flex h-[52px] shrink-0 items-center gap-2.5 overflow-hidden border-b border-mac-line bg-mac-chrome/60 px-2.5 backdrop-blur-xl"
     >
       <div className="flex shrink-0 items-center gap-0.5">
         <IconButton label="后退" hint="Alt+←" disabled={historyIndex <= 0} onPress={goBack}>
@@ -243,8 +258,6 @@ export function Toolbar() {
           <SFArrowClockwise size={16} />
         </IconButton>
       </div>
-
-      <div className="mx-1 h-5 w-px shrink-0 bg-mac-line" />
 
       <ToggleButtonGroup
         aria-label="视图"
@@ -267,9 +280,10 @@ export function Toolbar() {
       {/* View options: sizes, density, extensions, preview */}
       <Dropdown>
         <Button
+          isIconOnly
           size="sm"
           variant="ghost"
-          className={TOOL_BUTTON_CLASS}
+          className={TOOL_ICON_CLASS}
           aria-label="视图选项"
         >
           <SFSliderHorizontal3 size={16} />
@@ -319,13 +333,11 @@ export function Toolbar() {
           className={TOOL_BUTTON_CLASS}
           aria-label={`排序：${SORT_LABELS[sortKey]}${sortDir === "asc" ? "升序" : "降序"}`}
         >
-          <SFArrowUpArrowDown size={16} />
+          {sortDir === "asc" ? <SFArrowUp size={14} /> : <SFArrowDown size={14} />}
           <span className="whitespace-nowrap">
             {showLabels ? SORT_LABELS[sortKey] : "排序"}
           </span>
-          <span className="text-[10px] opacity-70">
-            {sortDir === "asc" ? "↑" : "↓"}
-          </span>
+          <SFChevronDown size={9} className="opacity-55" />
         </Button>
         <Dropdown.Popover placement="bottom start" className="min-w-[208px]">
           <Dropdown.Menu onAction={handleSortAction}>
@@ -357,11 +369,12 @@ export function Toolbar() {
           className={TOOL_BUTTON_CLASS}
           aria-label={`分组：${GROUP_LABELS[groupKey]}`}
         >
-          <SFLine3Horizontal size={16} />
+          <SFLine3Horizontal size={15} />
           {showLabels && <span className="whitespace-nowrap">分组</span>}
           {groupKey !== "none" && (
             <span className="size-1.5 rounded-full bg-mac-blue" aria-hidden="true" />
           )}
+          <SFChevronDown size={9} className="opacity-55" />
         </Button>
         <Dropdown.Popover placement="bottom start" className="min-w-[184px]">
           <Dropdown.Menu onAction={(key) => setGroup(String(key) as GroupKey)}>
@@ -379,57 +392,60 @@ export function Toolbar() {
         </Dropdown.Popover>
       </Dropdown>
 
-      <div className="mx-1 h-5 w-px shrink-0 bg-mac-line" />
-
-      <Dropdown>
-        <Button size="sm" variant="ghost" className={TOOL_BUTTON_CLASS} aria-label="新建">
-          <SFPlus size={16} />
-          {showLabels && <span>新建</span>}
-        </Button>
-        <Dropdown.Popover placement="bottom start" className="w-[268px]">
-          <Dropdown.Menu
-            onAction={(key) => {
-              const value = String(key);
-              if (value === "folder") {
-                openDialog({ kind: "new-folder" });
-                return;
-              }
-              const type = NEW_FILE_TYPES.find((item) => item.extension === value);
-              if (!type) return;
-              openDialog({
-                kind: "new-file",
-                extension: type.extension,
-                label: type.label,
-                content: type.content,
-              });
-            }}
-          >
-            <Dropdown.Item id="folder" textValue="新建文件夹">
-              <SFFolderBadgePlus size={16} className="shrink-0 text-muted" />
-              <Label>新建文件夹</Label>
-              <span className="ml-auto text-[11px] text-muted">Ctrl+Shift+N</span>
-            </Dropdown.Item>
-            <Separator />
-            {NEW_FILE_TYPES.map((type) => (
-              <Dropdown.Item
-                key={type.extension}
-                id={type.extension}
-                textValue={`${type.label} .${type.extension}`}
-              >
-                <span className="grid size-5 shrink-0 place-items-center">
-                  <FormatIcon ext={type.extension} size={20} />
-                </span>
-                <Label>{type.label}</Label>
-                <span className="ml-auto text-[11px] text-muted">
-                  .{type.extension}
-                </span>
-              </Dropdown.Item>
-            ))}
-          </Dropdown.Menu>
-        </Dropdown.Popover>
-      </Dropdown>
-
       <div className="ml-auto flex min-w-0 items-center gap-2">
+        <Dropdown>
+          <Button
+            isIconOnly
+            size="sm"
+            variant="ghost"
+            className={TOOL_ICON_CLASS}
+            aria-label="新建"
+          >
+            <SFPlus size={16} />
+          </Button>
+          <Dropdown.Popover placement="bottom end" className="w-[268px]">
+            <Dropdown.Menu
+              onAction={(key) => {
+                const value = String(key);
+                if (value === "folder") {
+                  openDialog({ kind: "new-folder" });
+                  return;
+                }
+                const type = NEW_FILE_TYPES.find((item) => item.extension === value);
+                if (!type) return;
+                openDialog({
+                  kind: "new-file",
+                  extension: type.extension,
+                  label: type.label,
+                  content: type.content,
+                });
+              }}
+            >
+              <Dropdown.Item id="folder" textValue="新建文件夹">
+                <SFFolderBadgePlus size={16} className="shrink-0 text-muted" />
+                <Label>新建文件夹</Label>
+                <span className="ml-auto text-[11px] text-muted">Ctrl+Shift+N</span>
+              </Dropdown.Item>
+              <Separator />
+              {NEW_FILE_TYPES.map((type) => (
+                <Dropdown.Item
+                  key={type.extension}
+                  id={type.extension}
+                  textValue={`${type.label} .${type.extension}`}
+                >
+                  <span className="grid size-5 shrink-0 place-items-center">
+                    <FormatIcon ext={type.extension} size={20} />
+                  </span>
+                  <Label>{type.label}</Label>
+                  <span className="ml-auto text-[11px] text-muted">
+                    .{type.extension}
+                  </span>
+                </Dropdown.Item>
+              ))}
+            </Dropdown.Menu>
+          </Dropdown.Popover>
+          </Dropdown>
+
         <SearchField
           aria-label="搜索"
           value={query}
@@ -438,7 +454,7 @@ export function Toolbar() {
           variant="secondary"
           className="w-[150px] shrink-0 lg:w-[190px] 2xl:w-[240px]"
         >
-          <SearchField.Group className="h-7 w-full rounded-md">
+          <SearchField.Group className="h-7 w-full rounded-[7px]">
             <SearchField.SearchIcon className="size-3.5" />
             <SearchField.Input
               placeholder="搜索"
@@ -462,9 +478,11 @@ export function Toolbar() {
           <Button
             isIconOnly
             size="sm"
-            variant={previewOpen ? "secondary" : "ghost"}
+            variant="ghost"
             aria-label={previewOpen ? "隐藏预览面板" : "显示预览面板"}
-            className="shrink-0"
+            className={`${TOOL_ICON_CLASS} ${
+              previewOpen ? "bg-black/[0.07] text-mac-text dark:bg-white/[0.12]" : ""
+            }`}
             onPress={togglePreview}
           >
             <SFSidebarRight size={16} />
@@ -475,7 +493,7 @@ export function Toolbar() {
         </Tooltip>
 
         <Dropdown>
-          <Button isIconOnly size="sm" variant="ghost" aria-label="更多" className="shrink-0">
+          <Button isIconOnly size="sm" variant="ghost" aria-label="更多" className={TOOL_ICON_CLASS}>
             <SFEllipsis size={18} />
           </Button>
           <Dropdown.Popover placement="bottom end" className="min-w-[248px]">
