@@ -11,6 +11,11 @@ import {
   toggleMaximizeWindow,
 } from "../lib/window";
 
+/**
+ * Window controls kept on the right, but drawn like macOS ones: a small,
+ * borderless glyph in a 26px pill that only shows a surface on hover. No
+ * traffic-light colours — the close button just warms up slightly.
+ */
 function CaptionButton({
   label,
   onPress,
@@ -29,10 +34,12 @@ function CaptionButton({
       title={label}
       onClick={onPress}
       className={clsx(
-        "grid h-full w-11 place-items-center text-mac-muted transition-colors",
+        "grid size-[26px] place-items-center rounded-[6px] text-mac-text/65",
+        "transition-colors duration-100 outline-none",
+        "focus-visible:ring-2 focus-visible:ring-mac-blue/50",
         danger
-          ? "hover:bg-[#e81123] hover:text-white"
-          : "hover:bg-black/[0.06] hover:text-mac-text dark:hover:bg-white/[0.09]",
+          ? "hover:bg-[#ff3b30]/12 hover:text-[#ff3b30] active:bg-[#ff3b30]/18 dark:hover:bg-[#ff3b30]/20"
+          : "hover:bg-black/[0.07] hover:text-mac-text active:bg-black/[0.11] dark:hover:bg-white/[0.1] dark:active:bg-white/[0.16]",
       )}
     >
       {children}
@@ -81,22 +88,22 @@ export function TitleBar() {
         </div>
       </div>
 
-      <div className="ml-auto flex h-full items-center">
+      <div className="ml-auto flex h-full items-center gap-0.5 pr-2">
         <CaptionButton label="最小化" onPress={() => void minimizeWindow()}>
-          <SFMinus size={14} />
+          <SFMinus size={13} />
         </CaptionButton>
         <CaptionButton
           label="最大化"
           onPress={() => void toggleMaximizeWindow()}
         >
-          <SFSquare size={11} />
+          <SFSquare size={10} />
         </CaptionButton>
         <CaptionButton
           label="关闭"
           danger
           onPress={() => void closeWindow()}
         >
-          <SFXmark size={14} />
+          <SFXmark size={12} />
         </CaptionButton>
       </div>
     </header>

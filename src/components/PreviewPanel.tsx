@@ -39,6 +39,11 @@ const VIDEO_EXTENSIONS = new Set(["mp4", "m4v", "webm", "mov", "mkv", "avi", "wm
 const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "flac", "m4a", "ogg", "opus", "aac", "wma", "aiff"]);
 
 const MAX_PREVIEW_CHARS = 20000;
+/** Quiet footer button: text only, surface on hover, like a macOS pane. */
+const PANEL_BUTTON =
+  "flex h-7 min-w-0 flex-1 items-center justify-center gap-1 rounded-[6px] px-2 text-[11.5px] " +
+  "transition-colors duration-100 hover:bg-black/[0.06] dark:hover:bg-white/[0.08] " +
+  "outline-none focus-visible:ring-2 focus-visible:ring-mac-blue/50";
 const MIN_WIDTH = 220;
 const MAX_WIDTH = 560;
 const WIDTH_KEY = "oriel:pref-preview-width";
@@ -77,8 +82,8 @@ function InfoRow({
   title?: string;
 }) {
   return (
-    <div className="flex items-start gap-3 py-[3px]">
-      <span className="w-[56px] shrink-0 text-[11px] text-mac-muted">{label}</span>
+    <div className="flex items-start gap-2 py-[3px]">
+      <span className="w-[48px] shrink-0 text-[11px] text-mac-muted">{label}</span>
       <span
         className={clsx(
           "min-w-0 flex-1 break-words text-[12px] text-mac-text",
@@ -270,18 +275,17 @@ export function PreviewPanel() {
         className="absolute -left-[3px] top-0 z-10 h-full w-[6px] cursor-col-resize"
       />
 
-      <div className="flex h-9 shrink-0 items-center justify-between border-b border-mac-line pl-3 pr-1.5">
-        <span className="text-[11px] font-medium text-mac-muted">预览</span>
-        <Button
-          isIconOnly
-          size="sm"
-          variant="ghost"
+      <div className="flex h-8 shrink-0 items-center border-b border-mac-line pl-3 pr-2">
+        <span className="text-[11.5px] font-medium text-mac-text/70">预览</span>
+        <span className="flex-1" />
+        <button
+          type="button"
           aria-label="关闭预览"
-          className="size-6 min-w-6 text-mac-muted"
-          onPress={() => setPreviewOpen(false)}
+          onClick={() => setPreviewOpen(false)}
+          className="grid size-6 place-items-center rounded-[6px] text-mac-text/55 transition-colors duration-100 hover:bg-black/[0.07] hover:text-mac-text dark:hover:bg-white/[0.1]"
         >
-          <SFXmark size={12} />
-        </Button>
+          <SFXmark size={11} />
+        </button>
       </div>
 
       {!entry ? (
@@ -419,35 +423,31 @@ export function PreviewPanel() {
             )}
           </div>
 
-          <div className="shrink-0 space-y-1.5 border-t border-mac-line px-4 py-2.5">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 w-full rounded-md bg-black/[0.05] text-[12px] text-mac-text hover:bg-black/[0.08] dark:bg-white/[0.08] dark:hover:bg-white/[0.12]"
-              onPress={() => void openEntry(entry)}
+          <div className="flex shrink-0 items-center gap-1 border-t border-mac-line px-2 py-1.5">
+            <button
+              type="button"
+              onClick={() => void openEntry(entry)}
+              className={`${PANEL_BUTTON} text-mac-text`}
             >
               打开
-            </Button>
-            <div className="flex gap-1.5">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 flex-1 rounded-md text-[11px] text-mac-muted hover:bg-black/[0.05] dark:hover:bg-white/[0.07]"
-                onPress={() => void reveal(entry.path)}
-              >
-                <SFArrowUpRightSquare size={13} />
-                定位
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 flex-1 rounded-md text-[11px] text-mac-muted hover:bg-black/[0.05] dark:hover:bg-white/[0.07]"
-                onPress={copyPath}
-              >
-                <SFSquareOnSquare size={13} />
-                复制路径
-              </Button>
-            </div>
+            </button>
+            <span className="h-4 w-px shrink-0 bg-mac-line" />
+            <button
+              type="button"
+              onClick={() => void reveal(entry.path)}
+              className={`${PANEL_BUTTON} text-mac-muted`}
+            >
+              <SFArrowUpRightSquare size={12} />
+              定位
+            </button>
+            <button
+              type="button"
+              onClick={copyPath}
+              className={`${PANEL_BUTTON} text-mac-muted`}
+            >
+              <SFSquareOnSquare size={12} />
+              复制路径
+            </button>
           </div>
         </div>
       )}
