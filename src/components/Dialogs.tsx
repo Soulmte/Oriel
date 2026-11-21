@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, CopyX, FolderPlus, Pencil, Trash2 } from "lucide-react";
+import { AlertTriangle, CopyX, FilePlus, FolderPlus, Pencil, Trash2 } from "lucide-react";
 import { Button, Input, Label, Modal } from "@heroui/react";
 import type { ConflictPolicy } from "@oriel/shared";
 import { useExplorer } from "../store/explorer";
@@ -9,6 +9,7 @@ export function Dialogs() {
   const dialog = useExplorer((state) => state.dialog);
   const closeDialog = useExplorer((state) => state.closeDialog);
   const createFolder = useExplorer((state) => state.createFolder);
+  const createFile = useExplorer((state) => state.createFile);
   const renameEntry = useExplorer((state) => state.renameEntry);
   const submitTransfer = useExplorer((state) => state.submitTransfer);
   const performRemove = useExplorer((state) => state.performRemove);
@@ -21,6 +22,8 @@ export function Dialogs() {
   useEffect(() => {
     if (dialog?.kind === "new-folder") {
       setValue("未命名文件夹");
+    } else if (dialog?.kind === "new-file") {
+      setValue("新建文本文档.txt");
     } else if (dialog?.kind === "rename") {
       setValue(dialog.entry.name);
     } else {
@@ -53,7 +56,9 @@ export function Dialogs() {
     const ok =
       dialog.kind === "new-folder"
         ? await createFolder(trimmed)
-        : await renameEntry(trimmed);
+        : dialog.kind === "new-file"
+          ? await createFile(trimmed)
+          : await renameEntry(trimmed);
     setBusy(false);
 
     if (ok) closeDialog();
@@ -226,12 +231,18 @@ export function Dialogs() {
                 <Modal.Icon className="bg-mac-blue/15 text-mac-blue">
                   {dialog?.kind === "rename" ? (
                     <Pencil className="size-5" />
+                  ) : dialog?.kind === "new-file" ? (
+                    <FilePlus className="size-5" />
                   ) : (
                     <FolderPlus className="size-5" />
                   )}
                 </Modal.Icon>
                 <Modal.Heading>
-                  {dialog?.kind === "rename" ? "重命名" : "新建文件夹"}
+                  {dialog?.kind === "rename"
+                    ? "重命名"
+                    : dialog?.kind === "new-file"
+                      ? "新建文本文档"
+                      : "新建文件夹"}
                 </Modal.Heading>
               </Modal.Header>
 

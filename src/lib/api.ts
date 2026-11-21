@@ -163,6 +163,11 @@ export const api = {
   mkdir: (path: string, name: string) =>
     post<{ path: string }>("/fs/mkdir", { path, name }),
 
+  newFile: (path: string, name: string) =>
+    post<{ path: string }>("/fs/new-file", { path, name }),
+
+  openTerminal: (path: string) => post<{ ok: true }>("/fs/terminal", { path }),
+
   rename: (path: string, newName: string) =>
     post<{ path: string }>("/fs/rename", { path, newName }),
 

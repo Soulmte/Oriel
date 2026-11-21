@@ -57,6 +57,7 @@ import type { AppearancePrefs } from "../lib/appearance";
 
 export type DialogState =
   | { kind: "new-folder" }
+  | { kind: "new-file" }
   | { kind: "rename"; entry: EntryDto }
   | { kind: "error"; message: string }
   | { kind: "confirm-remove"; paths: string[]; permanent: boolean }
@@ -270,6 +271,8 @@ interface ExplorerState {
   closeDialog: () => void;
 
   createFolder: (name: string) => Promise<boolean>;
+  createFile: (name: string) => Promise<boolean>;
+  openTerminal: () => Promise<void>;
   renameEntry: (name: string) => Promise<boolean>;
   removePaths: (paths: string[], permanent?: boolean) => Promise<void>;
   /** Performs the delete after the confirmation dialog was accepted. */
@@ -1710,6 +1713,37 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
     } catch (error) {
       set({ dialog: { kind: "error", message: errorMessage(error) } });
       return false;
+    }
+  },
+
+  async createFile(name) {
+    const { path } = get();
+    if (isArchivePath(path)) {
+      get().notify("归档内容只读，请先解压到文件夹");
+      return false;
+    }
+    try {
+      const created = await api.newFile(path, name);
+      await get().reload();
+      set({ selected: [created.path], anchor: created.path });
+      get().notify("已新建文件");
+      return true;
+    } catch (error) {
+      set({ dialog: { kind: "error", message: errorMessage(error) } });
+      return false;
+    }
+  },
+
+  async openTerminal() {
+    const { path } = get();
+    if (!path || isArchivePath(path)) {
+      get().notify("归档内不能打开终端");
+      return;
+    }
+    try {
+      await api.openTerminal(path);
+    } catch (error) {
+      get().notify(errorMessage(error));
     }
   },
 

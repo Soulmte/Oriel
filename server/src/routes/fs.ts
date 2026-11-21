@@ -24,10 +24,12 @@ import { ApiError, fromFsError } from "../errors.js";
 import {
   copyEntries,
   createDownloadStream,
+  createFile,
   createFolder,
   isHiddenEntryName,
   listDirectory,
   moveEntries,
+  openTerminal,
   openWithSystem,
   pathExists,
   readPreview,
@@ -692,6 +694,27 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
     const name = validateEntryName(body.name);
     const created = await createFolder(target, name);
     return { path: created };
+  });
+
+  /** Creates an empty text file in the current folder. */
+  app.post("/fs/new-file", async (request) => {
+    const body = (request.body ?? {}) as Body;
+    assertNotArchive(body.path);
+    const target = normalizePath(body.path);
+    assertWritable(target);
+    const name = validateEntryName(body.name);
+    const created = await createFile(target, name);
+    return { path: created };
+  });
+
+  app.post("/fs/terminal", async (request) => {
+    const body = (request.body ?? {}) as Body;
+    assertNotArchive(body.path);
+    const target = normalizePath(body.path);
+    const stat = await statOrThrow(target);
+    const directory = stat.isDirectory() ? target : path.dirname(target);
+    await openTerminal(directory);
+    return { ok: true };
   });
 
   app.post("/fs/rename", async (request) => {

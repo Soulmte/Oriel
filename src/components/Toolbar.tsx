@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Button,
   Dropdown,
@@ -15,24 +16,28 @@ import {
   SFArrowUpArrowDown,
   SFArrowUpRightSquare,
   SFCheckmark,
+  SFChevronDown,
   SFChevronLeft,
   SFChevronRight,
   SFChevronUp,
   SFEllipsis,
   SFEye,
   SFFolderBadgePlus,
+  SFGearshapeFill,
   SFLine3Horizontal,
   SFListBullet,
+  SFSliderHorizontal3,
+  SFPlus,
   SFSidebarRight,
   SFSquareGrid2x2,
+  SFAppleTerminal,
 } from "sf-symbols-lib/dualtone";
-import { Loader2 } from "lucide-react";
+import { Loader2, FilePlus, Link2 } from "lucide-react";
 import type { SortKey, ViewMode } from "@oriel/shared";
 import { useExplorer } from "../store/explorer";
 import { GROUP_LABELS } from "../lib/grouping";
 import type { GroupKey } from "../lib/grouping";
-
-const GROUP_KEYS = Object.keys(GROUP_LABELS) as GroupKey[];
+import { DENSITY_LABELS, GRID_SIZE_LABELS } from "../lib/appearance";
 
 const SORT_LABELS: Record<SortKey, string> = {
   name: "名称",
@@ -42,14 +47,17 @@ const SORT_LABELS: Record<SortKey, string> = {
 };
 
 const SORT_KEYS = Object.keys(SORT_LABELS) as SortKey[];
+const GROUP_KEYS = Object.keys(GROUP_LABELS) as GroupKey[];
 
 function IconButton({
   label,
+  hint,
   disabled,
   onPress,
   children,
 }: {
   label: string;
+  hint?: string;
   disabled?: boolean;
   onPress: () => void;
   children: ReactNode;
@@ -66,13 +74,19 @@ function IconButton({
       >
         {children}
       </Button>
-      <Tooltip.Content>{label}</Tooltip.Content>
+      <Tooltip.Content>
+        {label}
+        {hint ? ` · ${hint}` : ""}
+      </Tooltip.Content>
     </Tooltip>
   );
 }
 
 const SEGMENT_CLASS =
   "size-6 min-w-6 rounded-[5px] border-0 bg-transparent px-0 text-mac-muted data-[hovered=true]:bg-black/[0.04] data-[hovered=true]:text-mac-text data-[selected=true]:bg-mac-surface data-[selected=true]:text-mac-text data-[selected=true]:shadow-sm dark:data-[hovered=true]:bg-white/10";
+
+const TOOL_BUTTON_CLASS =
+  "gap-1.5 px-2 text-[12.5px] text-mac-muted";
 
 export function Toolbar() {
   const history = useExplorer((state) => state.history);
@@ -95,51 +109,116 @@ export function Toolbar() {
   const path = useExplorer((state) => state.path);
   const reveal = useExplorer((state) => state.reveal);
   const showHidden = useExplorer((state) => state.showHidden);
-  const toggleHidden = useExplorer((state) => state.toggleHidden);
+  const setShowHidden = useExplorer((state) => state.setShowHidden);
   const previewOpen = useExplorer((state) => state.previewOpen);
   const togglePreview = useExplorer((state) => state.togglePreview);
+  const openSettings = useExplorer((state) => state.openSettings);
+  const openTerminal = useExplorer((state) => state.openTerminal);
+  const notify = useExplorer((state) => state.notify);
+  const appearance = useExplorer((state) => state.appearance);
+  const setAppearance = useExplorer((state) => state.setAppearance);
+
+  /** Collapse text labels when the window (or the UI scale) gets narrow. */
+  const bar = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    const node = bar.current;
+    if (!node) return;
+    const update = () => setWidth(node.clientWidth);
+    update();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const showLabels = width === 0 || width >= 860;
 
   const handleViewChange = (keys: Set<Key>) => {
     const next = Array.from(keys)[0];
     if (next === "grid" || next === "list") setView(next as ViewMode);
   };
 
-  const handleMoreAction = (key: Key) => {
-    switch (String(key)) {
-      case "hidden":
-        toggleHidden();
-        break;
-      case "reveal":
-        void reveal(path);
-        break;
-      case "refresh":
-        reload();
-        break;
+  const handleSortAction = (key: Key) => {
+    const value = String(key);
+    if (value === "dir-asc" || value === "dir-desc") {
+      const wanted = value === "dir-asc" ? "asc" : "desc";
+      if (sortDir !== wanted) setSort(sortKey);
+      return;
+    }
+    setSort(value as SortKey);
+  };
+
+  const handleMore = useCallback(
+    (key: Key) => {
+      switch (String(key)) {
+        case "hidden":
+          setShowHidden(!showHidden);
+          break;
+        case "reveal":
+          void reveal(path);
+          break;
+        case "terminal":
+          void openTerminal();
+          break;
+        case "copy-path":
+          void navigator.clipboard
+            .writeText(path)
+            .then(() => notify("已复制路径"))
+            .catch(() => notify("复制失败"));
+          break;
+        case "refresh":
+          reload();
+          break;
+        case "settings":
+          openSettings();
+          break;
+      }
+    },
+    [openSettings, openTerminal, notify, path, reload, reveal, setShowHidden, showHidden],
+  );
+
+  const handleViewOption = (key: Key) => {
+    const value = String(key);
+    if (value.startsWith("size-")) {
+      setAppearance("gridSize", value.slice(5) as "sm" | "md" | "lg");
+    } else if (value.startsWith("density-")) {
+      setAppearance("density", value.slice(8) as "compact" | "comfortable" | "spacious");
+    } else if (value === "extensions") {
+      setAppearance("showExtensions", !appearance.showExtensions);
+    } else if (value === "preview") {
+      togglePreview();
     }
   };
 
   return (
     <div
+      ref={bar}
       data-toolbar
-      className="flex h-12 shrink-0 items-center gap-1 border-b border-mac-line bg-mac-chrome/60 px-4 backdrop-blur-xl"
+      className="flex h-12 shrink-0 items-center gap-1 overflow-hidden border-b border-mac-line bg-mac-chrome/60 px-4 backdrop-blur-xl"
     >
-      <div className="flex items-center gap-0.5">
-        <IconButton label="后退" disabled={historyIndex <= 0} onPress={goBack}>
+      <div className="flex shrink-0 items-center gap-0.5">
+        <IconButton label="后退" hint="Alt+←" disabled={historyIndex <= 0} onPress={goBack}>
           <SFChevronLeft size={16} />
         </IconButton>
         <IconButton
           label="前进"
+          hint="Alt+→"
           disabled={historyIndex >= history.length - 1}
           onPress={goForward}
         >
           <SFChevronRight size={16} />
         </IconButton>
-        <IconButton label="上一级" disabled={!path} onPress={goUp}>
+        <IconButton label="上一级" hint="Backspace" disabled={!path} onPress={goUp}>
           <SFChevronUp size={16} />
+        </IconButton>
+        <IconButton label="刷新" hint="F5" disabled={!path} onPress={reload}>
+          <SFArrowClockwise size={16} />
         </IconButton>
       </div>
 
-      <div className="mx-1 h-5 w-px bg-mac-line" />
+      <div className="mx-1 h-5 w-px shrink-0 bg-mac-line" />
 
       <ToggleButtonGroup
         aria-label="视图"
@@ -148,50 +227,61 @@ export function Toolbar() {
         selectedKeys={[view]}
         onSelectionChange={handleViewChange}
         size="sm"
-        className="gap-0 rounded-[7px] border-0 bg-black/[0.06] p-0.5 dark:bg-white/10"
+        className="shrink-0 gap-0 rounded-[7px] border-0 bg-black/[0.06] p-0.5 dark:bg-white/10"
       >
-        <ToggleButton
-          id="grid"
-          isIconOnly
-          aria-label="图标视图"
-          className={SEGMENT_CLASS}
-        >
+        <ToggleButton id="grid" isIconOnly aria-label="图标视图" className={SEGMENT_CLASS}>
           <SFSquareGrid2x2 size={16} />
         </ToggleButton>
-        <ToggleButton
-          id="list"
-          isIconOnly
-          aria-label="列表视图"
-          className={SEGMENT_CLASS}
-        >
+        <ToggleButton id="list" isIconOnly aria-label="列表视图" className={SEGMENT_CLASS}>
           <ToggleButtonGroup.Separator className="bg-black/10 dark:bg-white/10" />
           <SFListBullet size={16} />
         </ToggleButton>
       </ToggleButtonGroup>
 
+      {/* View options: sizes, density, extensions, preview */}
       <Dropdown>
         <Button
           size="sm"
           variant="ghost"
-          className="gap-1.5 px-2 text-[12.5px] text-mac-muted"
-          aria-label={`排序：${SORT_LABELS[sortKey]}`}
+          className={TOOL_BUTTON_CLASS}
+          aria-label="视图选项"
         >
-          <SFArrowUpArrowDown size={16} />
-          <span>{SORT_LABELS[sortKey]}</span>
+          <SFSliderHorizontal3 size={16} />
         </Button>
-        <Dropdown.Popover placement="bottom start" className="min-w-[208px]">
-          <Dropdown.Menu onAction={(key) => setSort(String(key) as SortKey)}>
-            {SORT_KEYS.map((key) => (
-              <Dropdown.Item key={key} id={key} textValue={SORT_LABELS[key]}>
-                <Label>{SORT_LABELS[key]}</Label>
-                {sortKey === key && (
-                  <span className="ml-auto flex items-center gap-1.5 text-[11px] text-muted">
-                    {sortDir === "asc" ? "↑" : "↓"}
-                    <SFCheckmark size={14} />
-                  </span>
+        <Dropdown.Popover placement="bottom start" className="min-w-[232px]">
+          <Dropdown.Menu onAction={handleViewOption}>
+            {(["sm", "md", "lg"] as const).map((size) => (
+              <Dropdown.Item key={`size-${size}`} id={`size-${size}`} textValue={`图标 ${GRID_SIZE_LABELS[size]}`}>
+                <Label>图标大小：{GRID_SIZE_LABELS[size]}</Label>
+                {appearance.gridSize === size && (
+                  <SFCheckmark size={14} className="ml-auto text-muted" />
                 )}
               </Dropdown.Item>
             ))}
+            <Separator />
+            {(["compact", "comfortable", "spacious"] as const).map((density) => (
+              <Dropdown.Item
+                key={`density-${density}`}
+                id={`density-${density}`}
+                textValue={`行高 ${DENSITY_LABELS[density]}`}
+              >
+                <Label>列表密度：{DENSITY_LABELS[density]}</Label>
+                {appearance.density === density && (
+                  <SFCheckmark size={14} className="ml-auto text-muted" />
+                )}
+              </Dropdown.Item>
+            ))}
+            <Separator />
+            <Dropdown.Item id="extensions" textValue="显示文件扩展名">
+              <Label>显示文件扩展名</Label>
+              {appearance.showExtensions && (
+                <SFCheckmark size={14} className="ml-auto text-muted" />
+              )}
+            </Dropdown.Item>
+            <Dropdown.Item id="preview" textValue="显示预览面板">
+              <Label>显示预览面板</Label>
+              {previewOpen && <SFCheckmark size={14} className="ml-auto text-muted" />}
+            </Dropdown.Item>
           </Dropdown.Menu>
         </Dropdown.Popover>
       </Dropdown>
@@ -200,11 +290,52 @@ export function Toolbar() {
         <Button
           size="sm"
           variant="ghost"
-          className="gap-1.5 px-2 text-[12.5px] text-mac-muted"
+          className={TOOL_BUTTON_CLASS}
+          aria-label={`排序：${SORT_LABELS[sortKey]}${sortDir === "asc" ? "升序" : "降序"}`}
+        >
+          <SFArrowUpArrowDown size={16} />
+          <span className="whitespace-nowrap">
+            {showLabels ? SORT_LABELS[sortKey] : "排序"}
+          </span>
+          <span className="text-[10px] opacity-70">
+            {sortDir === "asc" ? "↑" : "↓"}
+          </span>
+        </Button>
+        <Dropdown.Popover placement="bottom start" className="min-w-[208px]">
+          <Dropdown.Menu onAction={handleSortAction}>
+            {SORT_KEYS.map((key) => (
+              <Dropdown.Item key={key} id={key} textValue={SORT_LABELS[key]}>
+                <Label>{SORT_LABELS[key]}</Label>
+                {sortKey === key && (
+                  <SFCheckmark size={14} className="ml-auto text-muted" />
+                )}
+              </Dropdown.Item>
+            ))}
+            <Separator />
+            <Dropdown.Item id="dir-asc" textValue="升序">
+              <Label>升序</Label>
+              {sortDir === "asc" && <SFCheckmark size={14} className="ml-auto text-muted" />}
+            </Dropdown.Item>
+            <Dropdown.Item id="dir-desc" textValue="降序">
+              <Label>降序</Label>
+              {sortDir === "desc" && <SFCheckmark size={14} className="ml-auto text-muted" />}
+            </Dropdown.Item>
+          </Dropdown.Menu>
+        </Dropdown.Popover>
+      </Dropdown>
+
+      <Dropdown>
+        <Button
+          size="sm"
+          variant="ghost"
+          className={TOOL_BUTTON_CLASS}
           aria-label={`分组：${GROUP_LABELS[groupKey]}`}
         >
           <SFLine3Horizontal size={16} />
-          <span>{groupKey === "none" ? "分组" : GROUP_LABELS[groupKey]}</span>
+          {showLabels && <span className="whitespace-nowrap">分组</span>}
+          {groupKey !== "none" && (
+            <span className="size-1.5 rounded-full bg-mac-blue" aria-hidden="true" />
+          )}
         </Button>
         <Dropdown.Popover placement="bottom start" className="min-w-[184px]">
           <Dropdown.Menu onAction={(key) => setGroup(String(key) as GroupKey)}>
@@ -222,24 +353,42 @@ export function Toolbar() {
         </Dropdown.Popover>
       </Dropdown>
 
-      <Button
-        size="sm"
-        variant="ghost"
-        className="gap-1.5 px-2 text-[12.5px] text-mac-muted"
-        onPress={() => openDialog({ kind: "new-folder" })}
-      >
-        <SFFolderBadgePlus size={16} />
-        <span className="hidden lg:inline">新建文件夹</span>
-      </Button>
+      <div className="mx-1 h-5 w-px shrink-0 bg-mac-line" />
 
-      <div className="ml-auto flex items-center gap-2">
+      <Dropdown>
+        <Button size="sm" variant="ghost" className={TOOL_BUTTON_CLASS} aria-label="新建">
+          <SFPlus size={16} />
+          {showLabels && <span>新建</span>}
+        </Button>
+        <Dropdown.Popover placement="bottom start" className="min-w-[216px]">
+          <Dropdown.Menu
+            onAction={(key) => {
+              if (String(key) === "folder") openDialog({ kind: "new-folder" });
+              else openDialog({ kind: "new-file" });
+            }}
+          >
+            <Dropdown.Item id="folder" textValue="新建文件夹">
+              <SFFolderBadgePlus size={14} className="shrink-0 text-muted" />
+              <Label>新建文件夹</Label>
+              <span className="ml-auto text-[11px] text-muted">Ctrl+Shift+N</span>
+            </Dropdown.Item>
+            <Dropdown.Item id="file" textValue="新建文本文档">
+              <FilePlus className="size-3.5 shrink-0 text-muted" />
+              <Label>新建文本文档</Label>
+              <span className="ml-auto text-[11px] text-muted">.txt</span>
+            </Dropdown.Item>
+          </Dropdown.Menu>
+        </Dropdown.Popover>
+      </Dropdown>
+
+      <div className="ml-auto flex min-w-0 items-center gap-2">
         <SearchField
           aria-label="搜索"
           value={query}
           onChange={setQuery}
           onSubmit={() => undefined}
           variant="secondary"
-          className="w-[200px] xl:w-[240px]"
+          className="w-[150px] shrink-0 lg:w-[190px] 2xl:w-[240px]"
         >
           <SearchField.Group className="h-7 w-full rounded-md">
             <SearchField.SearchIcon className="size-3.5" />
@@ -273,40 +422,45 @@ export function Toolbar() {
             <SFSidebarRight size={16} />
           </Button>
           <Tooltip.Content>
-            {previewOpen ? "隐藏预览面板" : "显示预览面板"}
+            {previewOpen ? "隐藏预览面板 · 空格" : "显示预览面板 · 空格"}
           </Tooltip.Content>
         </Tooltip>
 
         <Dropdown>
-          <Button
-            isIconOnly
-            size="sm"
-            variant="ghost"
-            aria-label="更多"
-            className="shrink-0"
-          >
+          <Button isIconOnly size="sm" variant="ghost" aria-label="更多" className="shrink-0">
             <SFEllipsis size={18} />
           </Button>
-          <Dropdown.Popover placement="bottom end" className="min-w-[240px]">
-            <Dropdown.Menu onAction={handleMoreAction}>
+          <Dropdown.Popover placement="bottom end" className="min-w-[248px]">
+            <Dropdown.Menu onAction={handleMore}>
               <Dropdown.Item id="hidden" textValue="显示隐藏文件">
                 <SFEye size={14} className="shrink-0 text-muted" />
                 <Label>显示隐藏文件</Label>
-                {showHidden && <SFCheckmark size={14} className="ml-auto" />}
+                <span className="ml-auto text-[11px] text-muted">Ctrl+H</span>
+                {showHidden && <SFCheckmark size={14} />}
               </Dropdown.Item>
               <Separator />
-              <Dropdown.Item
-                id="reveal"
-                textValue="在资源管理器中打开"
-                isDisabled={!path}
-              >
+              <Dropdown.Item id="reveal" textValue="在资源管理器中打开" isDisabled={!path}>
                 <SFArrowUpRightSquare size={14} className="shrink-0 text-muted" />
                 <Label>在资源管理器中打开</Label>
               </Dropdown.Item>
+              <Dropdown.Item id="terminal" textValue="在此处打开终端" isDisabled={!path}>
+                <SFAppleTerminal size={14} className="shrink-0 text-muted" />
+                <Label>在此处打开终端</Label>
+              </Dropdown.Item>
+              <Dropdown.Item id="copy-path" textValue="复制当前路径" isDisabled={!path}>
+                <Link2 className="size-3.5 shrink-0 text-muted" />
+                <Label>复制当前路径</Label>
+              </Dropdown.Item>
+              <Separator />
               <Dropdown.Item id="refresh" textValue="刷新">
                 <SFArrowClockwise size={14} className="shrink-0 text-muted" />
                 <Label>刷新</Label>
-                <span className="ml-auto text-[11px] text-muted">Ctrl+R</span>
+                <span className="ml-auto text-[11px] text-muted">F5</span>
+              </Dropdown.Item>
+              <Dropdown.Item id="settings" textValue="设置">
+                <SFGearshapeFill size={14} className="shrink-0 text-muted" />
+                <Label>设置</Label>
+                <span className="ml-auto text-[11px] text-muted">Ctrl+,</span>
               </Dropdown.Item>
             </Dropdown.Menu>
           </Dropdown.Popover>

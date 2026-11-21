@@ -459,6 +459,57 @@ export async function createFolder(parentPath: string, name: string): Promise<st
   return destination;
 }
 
+/** Creates an empty file; "new text document" from the toolbar. */
+export async function createFile(parentPath: string, name: string): Promise<string> {
+  const parentStat = await statOrThrow(parentPath);
+  if (!parentStat.isDirectory()) {
+    throw ApiError.badRequest("NOT_A_DIRECTORY", "目标不是文件夹");
+  }
+
+  const destination = path.join(parentPath, name);
+  if (await pathExists(destination)) {
+    throw ApiError.conflict(`“${name}” 已存在`);
+  }
+
+  try {
+    await fs.writeFile(destination, "", { flag: "wx" });
+  } catch (error) {
+    throw fromFsError(error, destination);
+  }
+  return destination;
+}
+
+/** Opens a terminal in the given folder (Windows Terminal when available). */
+export async function openTerminal(target: string): Promise<void> {
+  const { spawn } = await import("node:child_process");
+
+  if (process.platform !== "win32") {
+    const child = spawn(
+      process.platform === "darwin" ? "open" : "x-terminal-emulator",
+      process.platform === "darwin" ? ["-a", "Terminal", target] : [],
+      { cwd: target, detached: true, stdio: "ignore" },
+    );
+    child.unref();
+    return;
+  }
+
+  // `wt` ships with Windows 11; fall back to a plain PowerShell window.
+  const child = spawn("wt.exe", ["-d", target], {
+    detached: true,
+    stdio: "ignore",
+    windowsHide: false,
+  });
+  child.on("error", () => {
+    const fallback = spawn(
+      "powershell.exe",
+      ["-NoExit", "-Command", `Set-Location -LiteralPath '${target.replace(/'/g, "''")}'`],
+      { detached: true, stdio: "ignore", windowsHide: false, cwd: target },
+    );
+    fallback.unref();
+  });
+  child.unref();
+}
+
 export async function renameEntry(
   target: string,
   newName: string,
