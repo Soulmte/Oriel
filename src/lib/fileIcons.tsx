@@ -363,8 +363,8 @@ const extVisuals: Record<string, FileVisual> = {
   pyi: brand(siPython),
   rs: brand(siRust, "#dea584"),
   go: brand(siGo),
-  java: glyph(SFCupAndHeatWavesFill, "#e76f00"),
-  jar: glyph(SFCupAndHeatWavesFill, "#e76f00"),
+  java: doc("JAVA", "#e76f00"),
+  jar: doc("JAR", "#e76f00"),
   kt: brand(siKotlin),
   kts: brand(siKotlin),
   swift: brand(siSwift),
@@ -662,7 +662,7 @@ const BADGE_LABELS: Record<string, string> = {
   js: "JS",
   jsx: "JSX",
   json: "JSON",
-  json5: "J5",
+  json5: "JSON",
   jsonc: "JSON",
   html: "HTML",
   htm: "HTML",
@@ -700,7 +700,7 @@ const BADGE_LABELS: Record<string, string> = {
   hh: "HH",
   m: "M",
   mm: "MM",
-  swift: "SWIFT",
+  swift: "SWFT",
   dart: "DART",
   lua: "LUA",
   r: "R",
@@ -710,12 +710,12 @@ const BADGE_LABELS: Record<string, string> = {
   exs: "EXS",
   erl: "ERL",
   clj: "CLJ",
-  scala: "SCALA",
+  scala: "SCL",
   asm: "ASM",
   s: "ASM",
   vue: "VUE",
-  svelte: "SVELTE",
-  astro: "ASTRO",
+  svelte: "SVLT",
+  astro: "ASTR",
   less: "LESS",
   sass: "SASS",
   styl: "STYL",
@@ -729,18 +729,23 @@ const BADGE_LABELS: Record<string, string> = {
   sol: "SOL",
   nix: "NIX",
   tf: "TF",
-  gradle: "GRADLE",
-  ipynb: "IPYNB",
-  sqlite: "SQLITE",
-  sqlite3: "SQLITE",
+  gradle: "GRDL",
+  ipynb: "IPY",
+  sqlite: "SQLT",
+  sqlite3: "SQLT",
   db: "DB",
   db3: "DB",
   mdb: "MDB",
-  parquet: "PARQUET",
+  parquet: "PRQT",
+  arrow: "ARO",
+  cairo: "CRO",
+  coffee: "CF",
+  graphql: "GQL",
+  gql: "GQL",
   avro: "AVRO",
   xsl: "XSL",
   xslt: "XSLT",
-  xhtml: "XHTML",
+  xhtml: "XHT",
   psm1: "PS1",
   vbs: "VBS",
   dot: "DOT",
@@ -804,7 +809,8 @@ function badgeLabel(ext: string): string {
  * distinct logos.
  */
 function toBadgePage(visual: FileVisual, ext: string): FileVisual {
-  if (visual.kind === "page") return visual;
+  // Category symbols (key, cube, drive, table…) carry meaning, so they stay.
+  if (visual.kind !== "brand") return visual;
   return {
     kind: "page",
     background: visual.color,
@@ -879,6 +885,40 @@ function PageIcon({
   const line = Math.max(2, Math.round(size * 0.055));
   const lineRight = size * 0.08;
 
+  const fullLabel = visual.content.kind === "label" ? visual.content.text : "";
+  /**
+   * Badge text degrades gracefully with icon size: the list shows an Office-like
+   * single letter (a 4-letter label at 18px is a smudge), the grid shows two,
+   * and only large tiles spell the whole thing out.
+   */
+  const label =
+    size < 24
+      ? fullLabel.slice(0, 1)
+      : size < 32
+        ? fullLabel.slice(0, 2)
+        : fullLabel;
+  const labelLength = label.length;
+  /** Single letters keep the Office look; longer labels share one size. */
+  const labelSize =
+    labelLength === 0
+      ? 0
+      : labelLength === 1
+        ? badge * 0.58
+        : labelLength === 2
+          ? badge * 0.44
+          : badge * 0.42;
+  /**
+   * Rough advance width of an uppercase glyph (0.58em) plus even padding, capped
+   * so a 4-letter badge never turns into a banner.
+   */
+  const labelWidth =
+    labelLength <= 2
+      ? badge
+      : Math.min(
+          badge * 1.42,
+          Math.max(badge, Math.round(labelLength * labelSize * 0.58 + badge * 0.3)),
+        );
+
   return (
     <span
       className={clsx("relative shrink-0", className)}
@@ -929,21 +969,15 @@ function PageIcon({
         }}
       />
 
-      {/* Badge — Office places it vertically centred on the left edge. Wide
-          labels (JSON, HTML) get a wider badge so the letters stay readable. */}
+      {/* Badge — Office places it vertically centred on the left edge.
+          Letter height stays constant across formats; the badge only grows
+          sideways by the width the text actually needs, so TS / JS / JSON /
+          JAVA read as one family instead of four different styles. */}
       <span
         className="absolute left-0 grid place-items-center"
         style={{
           top: Math.round((size - badge) / 2),
-          width:
-            visual.content.kind === "label"
-              ? badge *
-                (visual.content.text.length <= 2
-                  ? 1
-                  : visual.content.text.length === 3
-                    ? 1.2
-                    : 1.42)
-              : badge,
+          width: visual.content.kind === "label" ? labelWidth : badge,
           height: badge,
           borderRadius: Math.max(3, Math.round(size * 0.13)),
           background: visual.background,
@@ -961,19 +995,11 @@ function PageIcon({
             className="font-semibold leading-none"
             style={{
               color: contrastText(visual.background),
-              fontSize:
-                visual.content.text.length === 1
-                  ? badge * 0.58
-                  : visual.content.text.length === 2
-                    ? badge * 0.44
-                    : visual.content.text.length === 3
-                      ? badge * 0.34
-                      : badge * 0.3,
-              letterSpacing:
-                visual.content.text.length >= 3 ? "-0.03em" : "-0.02em",
+              fontSize: labelSize,
+              letterSpacing: labelLength >= 3 ? "-0.02em" : undefined,
             }}
           >
-            {visual.content.text}
+            {label}
           </span>
         )}
       </span>
