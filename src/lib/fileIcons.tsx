@@ -9,7 +9,10 @@ import {
   SFArchiveboxFill,
   SFArrowDownCircleFill,
   SFCubeFill,
+  SFChevronLeftForwardslashChevronRight,
   SFCupAndHeatWavesFill,
+  SFCurlybraces,
+  SFEllipsisCurlybraces,
   SFCylinderFill,
   SFCylinderSplit1x2Fill,
   SFDocumentFill,
@@ -363,7 +366,7 @@ const extVisuals: Record<string, FileVisual> = {
   pyi: brand(siPython),
   rs: brand(siRust, "#dea584"),
   go: brand(siGo),
-  java: doc("JAVA", "#e76f00"),
+  java: doc("JAV", "#e76f00"),
   jar: doc("JAR", "#e76f00"),
   kt: brand(siKotlin),
   kts: brand(siKotlin),
@@ -582,7 +585,7 @@ const moreExtVisuals: Record<string, FileVisual> = {
   jl: brand(siJulia),
   nim: brand(siNim),
   zig: brand(siZig),
-  odin: doc("ODIN", "#5b8fd6"),
+  odin: doc("ODN", "#5b8fd6"),
   sol: brand(siSolidity, "#8b8b8b"),
   move: doc("MV", "#8a5cf6"),
   cairo: doc("CZ", "#8a5cf6"),
@@ -643,7 +646,7 @@ const moreExtVisuals: Record<string, FileVisual> = {
   fon: media(SFTextformat, "#6f7278"),
   sub: doc("SUB", "#6f7278"),
   ssa: doc("SSA", "#6f7278"),
-  ttml: doc("TTML", "#6f7278"),
+  ttml: doc("TTL", "#6f7278"),
   sbv: doc("SBV", "#6f7278"),
   ics: doc("ICS", "#c94f4f"),
   vcf: doc("VCF", "#4a7dd6"),
@@ -652,7 +655,22 @@ const moreExtVisuals: Record<string, FileVisual> = {
   kmz: doc("KMZ", "#4a8f5c"),
 };
 
-/** Compact badge text for extension-based icons (uppercase, <=4 chars). */
+/**
+ * Formats whose name is too long for a badge use their own symbol instead:
+ * `{}` for the JSON family, `</>` for markup, the cup for Java archives.
+ */
+const SYMBOL_BADGES: Record<string, SFIcon> = {
+  json: SFCurlybraces,
+  json5: SFCurlybraces,
+  jsonc: SFEllipsisCurlybraces,
+  html: SFChevronLeftForwardslashChevronRight,
+  htm: SFChevronLeftForwardslashChevronRight,
+  xhtml: SFChevronLeftForwardslashChevronRight,
+  java: SFCupAndHeatWavesFill,
+  jar: SFCupAndHeatWavesFill,
+};
+
+/** Compact badge text for extension-based icons (uppercase, <=3 chars). */
 const BADGE_LABELS: Record<string, string> = {
   txt: "TXT",
   md: "MD",
@@ -668,16 +686,16 @@ const BADGE_LABELS: Record<string, string> = {
   html: "<>",
   htm: "<>",
   css: "CSS",
-  scss: "SCSS",
+  scss: "SCS",
   py: "PY",
   rs: "RS",
   go: "GO",
-  java: "JAVA",
+  java: "JAV",
   sh: "SH",
   ps1: "PS1",
   yml: "YML",
-  yaml: "YAML",
-  toml: "TOML",
+  yaml: "YML",
+  toml: "TML",
   xml: "XML",
   csv: "CSV",
   sql: "SQL",
@@ -701,8 +719,8 @@ const BADGE_LABELS: Record<string, string> = {
   hh: "HH",
   m: "M",
   mm: "MM",
-  swift: "SWFT",
-  dart: "DART",
+  swift: "SWI",
+  dart: "DRT",
   lua: "LUA",
   r: "R",
   hs: "HS",
@@ -715,45 +733,45 @@ const BADGE_LABELS: Record<string, string> = {
   asm: "ASM",
   s: "ASM",
   vue: "VUE",
-  svelte: "SVLT",
-  astro: "ASTR",
-  less: "LESS",
-  sass: "SASS",
-  styl: "STYL",
-  bash: "BASH",
+  svelte: "SVL",
+  astro: "AST",
+  less: "LES",
+  sass: "SAS",
+  styl: "STY",
+  bash: "BSH",
   zsh: "ZSH",
-  fish: "FISH",
-  wasm: "WASM",
+  fish: "FSH",
+  wasm: "WAS",
   wat: "WAT",
   nim: "NIM",
   zig: "ZIG",
   sol: "SOL",
   nix: "NIX",
   tf: "TF",
-  gradle: "GRDL",
+  gradle: "GRD",
   ipynb: "IPY",
-  sqlite: "SQLT",
-  sqlite3: "SQLT",
+  sqlite: "SQL",
+  sqlite3: "SQL",
   db: "DB",
   db3: "DB",
   mdb: "MDB",
-  parquet: "PRQT",
+  parquet: "PRQ",
   arrow: "ARO",
   cairo: "CRO",
   coffee: "CF",
   graphql: "GQL",
   gql: "GQL",
-  avro: "AVRO",
+  avro: "AVR",
   xsl: "XSL",
-  xslt: "XSLT",
+  xslt: "XSL",
   xhtml: "<>",
   psm1: "PS1",
   vbs: "VBS",
   dot: "DOT",
-  dotx: "DOTX",
-  docm: "DOCM",
-  xlsm: "XLSM",
-  xlsb: "XLSB",
+  dotx: "W",
+  docm: "W",
+  xlsm: "X",
+  xlsb: "X",
 };
 
 const FALLBACK_BADGES = [
@@ -790,6 +808,17 @@ function visualFor(entry: EntryDto): FileVisual {
   if (!entry.ext) return documentVisual;
   const visual = extVisuals[entry.ext] ?? moreExtVisuals[entry.ext];
   if (!visual) return fallbackVisual(entry.ext);
+
+  const symbol = SYMBOL_BADGES[entry.ext];
+  if (symbol) {
+    return {
+      kind: "page",
+      background:
+        visual.kind === "page" ? visual.background : visual.color,
+      content: { kind: "symbol", Icon: symbol },
+    };
+  }
+
   return toBadgePage(visual, entry.ext);
 }
 
@@ -800,7 +829,10 @@ function visualFor(entry: EntryDto): FileVisual {
  */
 function badgeLabel(ext: string): string {
   const key = ext.toLowerCase();
-  return BADGE_LABELS[key] ?? key.toUpperCase().slice(0, 3);
+  const known = BADGE_LABELS[key] ?? key.toUpperCase();
+  // A fourth character makes the badge wider than the page; symbols or three
+  // letters keep every icon the same footprint.
+  return known.slice(0, 3);
 }
 
 /**
@@ -822,7 +854,6 @@ function toBadgePage(visual: FileVisual, ext: string): FileVisual {
 export function formatBadgeVisual(ext: string): FileVisual {
   const key = ext.toLowerCase();
   const known = extVisuals[key] ?? moreExtVisuals[key];
-  const label = BADGE_LABELS[key] ?? key.toUpperCase().slice(0, 4);
 
   const background =
     known?.kind === "page"
@@ -833,7 +864,16 @@ export function formatBadgeVisual(ext: string): FileVisual {
           ? known.color
           : (FALLBACK_BADGES[key.length % FALLBACK_BADGES.length] as string);
 
-  return { kind: "page", background, content: { kind: "label", text: label } };
+  const symbol = SYMBOL_BADGES[key];
+  if (symbol) {
+    return { kind: "page", background, content: { kind: "symbol", Icon: symbol } };
+  }
+
+  return {
+    kind: "page",
+    background,
+    content: { kind: "label", text: badgeLabel(key) },
+  };
 }
 
 /** Menu-sized icon for a file type, matching the listing's design. */
