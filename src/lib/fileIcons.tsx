@@ -196,7 +196,7 @@ const nameVisuals: Record<string, FileVisual> = {
 
 const extVisuals: Record<string, FileVisual> = {
   // Plain text and notes
-  txt: doc("T", "#8a8d93"),
+  txt: doc("TXT", "#8a8d93"),
   log: doc("L", "#6f7278"),
   tex: doc("T", "#3d8f6d"),
   srt: doc("S", "#6f7278"),
@@ -204,8 +204,8 @@ const extVisuals: Record<string, FileVisual> = {
   ass: doc("A", "#6f7278"),
 
   // Markdown family — Word-style page with a grey "M"
-  md: doc("M", "#8a8d93"),
-  mdx: doc("M", "#8a8d93"),
+  md: doc("MD", "#8a8d93"),
+  mdx: doc("MDX", "#8a8d93"),
   rst: doc("R", "#8a8d93"),
   adoc: doc("A", "#8a8d93"),
 
@@ -919,12 +919,22 @@ function PageIcon({
   size: number;
   className?: string;
 }) {
-  const pageWidth = size * 0.82;
-  const fold = Math.max(5, Math.round(size * 0.26));
-  const badge = Math.round(size * 0.56);
-  const radius = Math.max(2, Math.round(size * 0.06));
-  const line = Math.max(2, Math.round(size * 0.055));
-  const lineRight = size * 0.08;
+  // Shell icons are drawn at 0.86 of the box (they arrive pre-trimmed), so the
+  // generated page uses the same visual size — otherwise .md/.txt looked bigger.
+  const art = size * 0.86;
+  /** Keeps the page + badge composite the same footprint as a Shell icon. */
+  const inset = (size - art) / 2;
+  // Proportions copied from the Windows file icon family so a generated page
+  // lines up with the Office/PDF icons the Shell hands back.
+  const pageWidth = art * 0.82;
+  const pageHeight = art * 0.94;
+  const pageTop = inset + (art - pageHeight) / 2;
+  const fold = Math.max(3, Math.round(art * 0.2));
+  const badge = Math.round(art * 0.51);
+  const badgeLeft = inset + art * 0.06;
+  const radius = Math.max(2, Math.round(art * 0.06));
+  const line = Math.max(2, Math.round(art * 0.055));
+  const lineRight = art * 0.08;
 
   const fullLabel = visual.content.kind === "label" ? visual.content.text : "";
   /**
@@ -980,12 +990,15 @@ function PageIcon({
     >
       {/* Page */}
       <span
-        className="absolute right-0 top-0 h-full"
+        className="absolute"
         style={{
+          top: pageTop,
+          right: inset,
+          height: pageHeight,
           width: pageWidth,
           background: "#ffffff",
           borderRadius: radius,
-          boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.10)",
+          boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.22)",
           clipPath: `polygon(0 0, calc(100% - ${fold}px) 0, 100% ${fold}px, 100% 100%, 0 100%)`,
         }}
       />
@@ -996,8 +1009,8 @@ function PageIcon({
           key={top}
           className="absolute"
           style={{
-            right: lineRight,
-            top: size * top,
+            right: inset + lineRight,
+            top: pageTop + pageHeight * top,
             width: pageWidth * [0.5, 0.4, 0.56][index],
             height: line,
             borderRadius: 999,
@@ -1009,11 +1022,13 @@ function PageIcon({
 
       {/* Folded corner */}
       <span
-        className="absolute right-0 top-0"
+        className="absolute"
         style={{
+          top: pageTop,
+          right: inset,
           width: fold,
           height: fold,
-          background: "#e3e4e9",
+          background: "#e9ebf0",
           clipPath: "polygon(0 0, 100% 0, 100% 100%)",
           borderTopRightRadius: radius,
         }}
@@ -1024,9 +1039,11 @@ function PageIcon({
           sideways by the width the text actually needs, so TS / JS / JSON /
           JAVA read as one family instead of four different styles. */}
       <span
-        className="absolute left-0 grid place-items-center"
+        className="absolute grid place-items-center"
         style={{
-          top: Math.round((size - badge) / 2),
+          left: badgeLeft,
+          /* Office parks the badge a hair above the page centre. */
+          top: Math.round(pageTop + (pageHeight - badge) / 2 - badge * 0.05),
           width: visual.content.kind === "label" ? labelWidth : badge,
           height: badge,
           borderRadius: Math.max(3, Math.round(size * 0.13)),

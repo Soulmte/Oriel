@@ -60,10 +60,15 @@ export function Thumbnail({
           onLoad={() => setLoaded(true)}
           onError={() => setFailed(true)}
           className={clsx(
-            "relative size-full object-contain transition-opacity duration-150",
+            "relative object-contain transition-opacity duration-150",
             loaded ? "opacity-100" : "opacity-0",
           )}
-          style={{ borderRadius: rounded }}
+          /* Same visual size as the generated pages and Shell icons. */
+          style={{
+            width: Math.round(size * 0.86),
+            height: Math.round(size * 0.86),
+            borderRadius: rounded,
+          }}
         />
       )}
     </span>
