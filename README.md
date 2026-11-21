@@ -62,8 +62,9 @@ flowchart LR
 
 - **文档**（`md`、`txt`、`pdf`、Office、电子书…）画成 Office 文件的样子：白页 + 右上折角 + 淡色内容线 +
   左下角彩色角标；`readme.md` 就是 Word 文档造型配灰色 `M`。
-- **代码**（`ts`、`py`、`rs`、`go`…）直接用各语言官方 logo（来自 `simple-icons`），按品牌色绘制，
-  不带白色底页。
+- **代码**（`ts`、`py`、`rs`、`go`…）与文档同一版式：白页 + 品牌色字母角标（`TS`、`JSON`、`JAVA`、
+  `KT`…），品牌色取自各语言官方 logo，深色品牌会自动提亮、浅色角标（JS/JSON 的黄）用深色字，
+  保证整面网格读起来是同一套图标
 
 `.lnk` / `.url` / `.exe` / `.msi`、Office、PDF、电子书、压缩包这类条目会额外调用 `POST /api/fs/icons`，
 由服务端调用 PowerShell（`PrivateExtractIcons` + `SHGetImageList`，优先读取快捷方式自带的 `IconLocation`）

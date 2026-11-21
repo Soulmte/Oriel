@@ -652,7 +652,7 @@ const moreExtVisuals: Record<string, FileVisual> = {
   kmz: doc("KMZ", "#4a8f5c"),
 };
 
-/** Compact badge text for the "new file" menu (uppercase, <=4 chars). */
+/** Compact badge text for extension-based icons (uppercase, <=4 chars). */
 const BADGE_LABELS: Record<string, string> = {
   txt: "TXT",
   md: "MD",
@@ -662,6 +662,7 @@ const BADGE_LABELS: Record<string, string> = {
   js: "JS",
   jsx: "JSX",
   json: "JSON",
+  json5: "J5",
   jsonc: "JSON",
   html: "HTML",
   htm: "HTML",
@@ -681,6 +682,72 @@ const BADGE_LABELS: Record<string, string> = {
   sql: "SQL",
   bat: "BAT",
   ini: "INI",
+  jar: "JAR",
+  kt: "KT",
+  kts: "KTS",
+  jl: "JL",
+  rb: "RB",
+  php: "PHP",
+  cs: "CS",
+  fs: "FS",
+  fsx: "FSX",
+  c: "C",
+  h: "H",
+  cpp: "CPP",
+  cc: "CPP",
+  cxx: "CPP",
+  hpp: "HPP",
+  hh: "HH",
+  m: "M",
+  mm: "MM",
+  swift: "SWIFT",
+  dart: "DART",
+  lua: "LUA",
+  r: "R",
+  hs: "HS",
+  elm: "ELM",
+  ex: "EX",
+  exs: "EXS",
+  erl: "ERL",
+  clj: "CLJ",
+  scala: "SCALA",
+  asm: "ASM",
+  s: "ASM",
+  vue: "VUE",
+  svelte: "SVELTE",
+  astro: "ASTRO",
+  less: "LESS",
+  sass: "SASS",
+  styl: "STYL",
+  bash: "BASH",
+  zsh: "ZSH",
+  fish: "FISH",
+  wasm: "WASM",
+  wat: "WAT",
+  nim: "NIM",
+  zig: "ZIG",
+  sol: "SOL",
+  nix: "NIX",
+  tf: "TF",
+  gradle: "GRADLE",
+  ipynb: "IPYNB",
+  sqlite: "SQLITE",
+  sqlite3: "SQLITE",
+  db: "DB",
+  db3: "DB",
+  mdb: "MDB",
+  parquet: "PARQUET",
+  avro: "AVRO",
+  xsl: "XSL",
+  xslt: "XSLT",
+  xhtml: "XHTML",
+  psm1: "PS1",
+  vbs: "VBS",
+  dot: "DOT",
+  dotx: "DOTX",
+  docm: "DOCM",
+  xlsm: "XLSM",
+  xlsb: "XLSB",
 };
 
 const FALLBACK_BADGES = [
@@ -715,7 +782,9 @@ function visualFor(entry: EntryDto): FileVisual {
   if (lower.startsWith("tauri.conf.")) return nameVisuals["tauri.conf.json"] ?? documentVisual;
 
   if (!entry.ext) return documentVisual;
-  return extVisuals[entry.ext] ?? moreExtVisuals[entry.ext] ?? fallbackVisual(entry.ext);
+  const visual = extVisuals[entry.ext] ?? moreExtVisuals[entry.ext];
+  if (!visual) return fallbackVisual(entry.ext);
+  return toBadgePage(visual, entry.ext);
 }
 
 /**
@@ -723,6 +792,26 @@ function visualFor(entry: EntryDto): FileVisual {
  * brand logo. The toolbar's "新建" menu uses this so a new .ts/.json file looks
  * like the file it creates instead of a generic document.
  */
+function badgeLabel(ext: string): string {
+  const key = ext.toLowerCase();
+  return BADGE_LABELS[key] ?? key.toUpperCase().slice(0, 3);
+}
+
+/**
+ * Turns a brand-logo / symbol visual into the same white page + letter badge
+ * the rest of the listing uses (the brand colour becomes the badge colour).
+ * A folder of mixed code files then reads as one family instead of a wall of
+ * distinct logos.
+ */
+function toBadgePage(visual: FileVisual, ext: string): FileVisual {
+  if (visual.kind === "page") return visual;
+  return {
+    kind: "page",
+    background: visual.color,
+    content: { kind: "label", text: badgeLabel(ext) },
+  };
+}
+
 export function formatBadgeVisual(ext: string): FileVisual {
   const key = ext.toLowerCase();
   const known = extVisuals[key] ?? moreExtVisuals[key];
