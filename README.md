@@ -336,6 +336,25 @@ npm run icon
 | `空格` | 开关右侧预览面板 |
 | `Esc` | 先关闭预览，再清空选择 |
 
+## 图标预览
+
+想一次看全所有文件类型图标，生成一个预览目录即可：
+
+```bash
+node scripts/icon-preview.mjs            # 默认输出到 D:\oriel-icon-preview
+node scripts/icon-preview.mjs E:\icons  # 或指定位置
+```
+
+脚本会从 `src/lib/fileIcons.tsx` 里读出全部扩展名，生成：
+
+```
+oriel-icon-preview/
+├── _全部扩展名/        397 种扩展名 + 4 个未知格式
+├── 00-文本与笔记 … 25-字体、字幕、地理/   按类别拆分
+├── 特殊文件名/         package.json、Dockerfile、.gitignore、README.md…
+└── 真实文件/           真实 png/json/md（缩略图与 Shell 图标）
+```
+
 ## 发布、镜像与 CDN
 
 ```bash
