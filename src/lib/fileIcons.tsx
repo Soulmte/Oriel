@@ -661,11 +661,12 @@ const BADGE_LABELS: Record<string, string> = {
   tsx: "TSX",
   js: "JS",
   jsx: "JSX",
-  json: "JSON",
-  json5: "JSON",
-  jsonc: "JSON",
-  html: "HTML",
-  htm: "HTML",
+  // Long names read better as their language's own punctuation.
+  json: "{}",
+  json5: "{}",
+  jsonc: "{}",
+  html: "<>",
+  htm: "<>",
   css: "CSS",
   scss: "SCSS",
   py: "PY",
@@ -745,7 +746,7 @@ const BADGE_LABELS: Record<string, string> = {
   avro: "AVRO",
   xsl: "XSL",
   xslt: "XSLT",
-  xhtml: "XHT",
+  xhtml: "<>",
   psm1: "PS1",
   vbs: "VBS",
   dot: "DOT",
@@ -891,22 +892,31 @@ function PageIcon({
    * single letter (a 4-letter label at 18px is a smudge), the grid shows two,
    * and only large tiles spell the whole thing out.
    */
-  const label =
-    size < 24
+  const punctuation =
+    fullLabel.length > 0 && !/[A-Za-z0-9]/.test(fullLabel);
+  // `{}` / `<>` are already short: keep both halves even at list sizes.
+  const label = punctuation
+    ? fullLabel
+    : size < 24
       ? fullLabel.slice(0, 1)
       : size < 32
         ? fullLabel.slice(0, 2)
         : fullLabel;
   const labelLength = label.length;
+  /** Punctuation badges ({}, <>) need a little more size and breathing room. */
+  const punctuationOnly = punctuation;
+
   /** Single letters keep the Office look; longer labels share one size. */
   const labelSize =
     labelLength === 0
       ? 0
-      : labelLength === 1
-        ? badge * 0.58
-        : labelLength === 2
-          ? badge * 0.44
-          : badge * 0.42;
+      : punctuationOnly
+        ? badge * 0.52
+        : labelLength === 1
+          ? badge * 0.58
+          : labelLength === 2
+            ? badge * 0.44
+            : badge * 0.42;
   /**
    * Rough advance width of an uppercase glyph (0.58em) plus even padding, capped
    * so a 4-letter badge never turns into a banner.
@@ -996,7 +1006,11 @@ function PageIcon({
             style={{
               color: contrastText(visual.background),
               fontSize: labelSize,
-              letterSpacing: labelLength >= 3 ? "-0.02em" : undefined,
+              letterSpacing: punctuationOnly
+                ? "0.14em"
+                : labelLength >= 3
+                  ? "-0.02em"
+                  : undefined,
             }}
           >
             {label}
