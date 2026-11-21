@@ -1,8 +1,10 @@
 # Oriel
 
-> 想直接看介绍？落地页在 [`site/index.html`](site/index.html)，项目文档在
-> [`site/docs.html`](site/docs.html)；推送到 `main` 后由 GitHub Pages 自动发布
-> （`Settings → Pages → Source: GitHub Actions`）。
+> **线上站点**：<https://soulmte.github.io/Oriel/>（落地页）·
+> <https://soulmte.github.io/Oriel/docs.html>（项目文档）
+>
+> 源码在 `site/`，纯静态 HTML + CSS，推送到 `main` 后由
+> `.github/workflows/pages.yml` 自动发布到 GitHub Pages。
 
 > 一个跑在 Windows 上的 Finder 风格文件管理器 —— Tauri 2 + React 19 + 本地 Fastify 服务。
 
