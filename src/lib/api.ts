@@ -152,11 +152,13 @@ export const api = {
     path: string,
     searchText: string,
     showHidden: boolean,
+    scope: "folder" | "disk" | "all" = "folder",
   ) =>
     `${BASE_URL}/api/fs/search/stream${query({
       path,
       q: searchText,
       showHidden,
+      scope,
       token: API_TOKEN || undefined,
     })}`,
 

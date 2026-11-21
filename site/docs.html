@@ -273,6 +273,13 @@ npm run dev:desktop</code></pre>
             <li>右键菜单分文件夹 / 文件 / 空白处三套，可逐项开关并与系统菜单项合并</li>
           </ul>
 
+          <h3>系统集成（桌面版）</h3>
+          <ul>
+            <li>开机自启：写当前用户的 Run 键，登录后静默启动</li>
+            <li>托盘图标：可隐藏；关闭窗口时最小化到托盘，服务继续运行</li>
+            <li>文件夹右键菜单：为文件夹、文件夹空白处与磁盘添加「用 Oriel 打开」</li>
+          </ul>
+
           <h3>归档</h3>
           <ul>
             <li>识别 7-Zip，把 zip / 7z / rar 当成只读目录浏览</li>
@@ -324,7 +331,10 @@ git push origin v0.1.0</code></pre>
         <section id="limits">
           <h2>已知限制</h2>
           <ul>
-            <li>Tauri 侧车尚未打包：桌面版目前需要本机有 Node 才能起 REST 服务</li>
+            <li>
+              安装包自带 Node 运行时与服务端（sidecar，约 33 MB）：窗口启动时会在后台起服务，
+              退出时一并结束；如果进程被强杀，服务也会因为 stdin 断开而自行退出
+            </li>
             <li>REST 服务未做多用户隔离，仅适合单机使用</li>
             <li>Office / 可执行文件图标依赖 Windows Shell，非 Windows 环境会退化成自绘图标</li>
             <li>安装包未签名，首次运行需要在 SmartScreen 中选择「仍要运行」</li>

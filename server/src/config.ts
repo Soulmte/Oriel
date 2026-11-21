@@ -19,7 +19,9 @@ export const config = {
    */
   token: (process.env.ORIEL_TOKEN ?? "").trim(),
   /** `owner/name` of the GitHub repository used by the update check. */
-  updateRepo: (process.env.ORIEL_UPDATE_REPO ?? "").trim(),
+  // The packaged app passes its own repository from Rust; the default keeps
+  // `npm run dev` honest too.
+  updateRepo: (process.env.ORIEL_UPDATE_REPO ?? "Soulmte/Oriel").trim(),
   /**
    * Optional CDN prefix for release assets, e.g. `https://dl.example.com/oriel`.
    * GitHub asset hosts are unreachable on some networks; with this set the

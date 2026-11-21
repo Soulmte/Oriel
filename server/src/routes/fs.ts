@@ -585,6 +585,24 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
       throw ApiError.badRequest(ERROR_CODES.notADirectory, "搜索起点必须是文件夹");
     }
 
+    /*
+     * Scope decides how wide the walk goes: the folder you are in, the whole
+     * volume that folder lives on, or every drive. Wider scopes reuse the same
+     * budget per root and stop as soon as the result limit is hit.
+     */
+    const scope = text(query.scope);
+    const roots =
+      scope === "disk"
+        ? [path.parse(target).root]
+        : scope === "all"
+          ? await Promise.resolve()
+              .then(async () => {
+                const { listDrives } = await import("../lib/drives.js");
+                return (await listDrives()).map((drive) => drive.path);
+              })
+              .catch(() => [path.parse(target).root])
+          : [target];
+
     const limitValue = Number(query.limit ?? SEARCH_RESULT_LIMIT);
     const limit = Number.isFinite(limitValue) ? limitValue : SEARCH_RESULT_LIMIT;
     const budgetValue = Number(query.budgetMs ?? SEARCH_BUDGET_MS);
@@ -620,24 +638,45 @@ export const fsRoutes: FastifyPluginAsync = async (app) => {
     request.raw.on("error", abort);
 
     let lastProgress = 0;
+    let scannedTotal = 0;
 
     try {
-      const result = await searchDirectory(target, searchText, {
-        showHidden: flag(query.showHidden),
-        limit,
-        budgetMs,
-        signal: controller.signal,
-        onMatches: (entries) => {
-          const payload: SearchMatchEvent = { entries };
-          send("matches", payload);
-        },
-        onProgress: (scanned) => {
-          const now = Date.now();
-          if (now - lastProgress < 250) return;
-          lastProgress = now;
-          send("progress", { scanned });
-        },
-      });
+      let scanned = 0;
+      let truncated = false;
+      let timedOut = false;
+      const collected: EntryDto[] = [];
+
+      for (const root of roots) {
+        if (controller.signal.aborted) break;
+        const remaining = Math.max(limit - collected.length, 0);
+        if (remaining === 0) break;
+
+        const result = await searchDirectory(root, searchText, {
+          showHidden: flag(query.showHidden),
+          limit: remaining,
+          budgetMs,
+          signal: controller.signal,
+          onMatches: (entries) => {
+            collected.push(...entries);
+            const payload: SearchMatchEvent = { entries };
+            send("matches", payload);
+          },
+          onProgress: (count) => {
+            const total = scannedTotal + count;
+            const now = Date.now();
+            if (now - lastProgress < 250) return;
+            lastProgress = now;
+            send("progress", { scanned: total });
+          },
+        });
+
+        scanned += result.scanned;
+        scannedTotal += result.scanned;
+        truncated ||= result.truncated;
+        timedOut ||= result.timedOut;
+      }
+
+      const result = { scanned, entries: collected, truncated, timedOut };
 
       const done: SearchDoneEvent = {
         path: target,

@@ -63,6 +63,8 @@ public static class MacExplorerShellIcon
 
     private const uint SHGFI_SYSICONINDEX = 0x4000;
     private const uint SHGFI_LARGEICON = 0x0;
+    private const uint SHGFI_USEFILEATTRIBUTES = 0x10;
+    private const uint FILE_ATTRIBUTE_NORMAL = 0x80;
     private static Guid IID_IImageList = new Guid("46EB5926-582E-4017-9FDF-E8998DAA0950");
 
     /// <summary>
@@ -84,6 +86,38 @@ public static class MacExplorerShellIcon
         return icon;
     }
 
+    private static Icon FromSystemIndex(int index, IntPtr imageList)
+    {
+        IntPtr handle = ImageList_GetIcon(imageList, index, 0);
+        if (handle == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        Icon icon = (Icon)Icon.FromHandle(handle).Clone();
+        DestroyIcon(handle);
+        return icon;
+    }
+
+    private static Icon FromImageList(int index)
+    {
+        int[] sizes = new int[] { 4, 2, 0 };
+        foreach (int size in sizes)
+        {
+            IntPtr imageList;
+            if (SHGetImageList(size, ref IID_IImageList, out imageList) == 0 && imageList != IntPtr.Zero)
+            {
+                Icon icon = FromSystemIndex(index, imageList);
+                if (icon != null)
+                {
+                    return icon;
+                }
+            }
+        }
+
+        return null;
+    }
+
     public static Icon GetIcon(string filePath)
     {
         SHFILEINFO info = new SHFILEINFO();
@@ -93,23 +127,30 @@ public static class MacExplorerShellIcon
             return null;
         }
 
-        int[] sizes = new int[] { 4, 2, 0 };
-        foreach (int size in sizes)
+        return FromImageList(info.iIcon);
+    }
+
+    /// <summary>
+    /// The icon Windows uses for a *kind* of file, without a real file to read
+    /// it from. This is what makes an .exe or .lnk whose own icon cannot be
+    /// extracted still show the system application glyph instead of nothing.
+    /// </summary>
+    public static Icon GetTypeIcon(string extension)
+    {
+        string probe = "oriel-icon-probe" + extension;
+        SHFILEINFO info = new SHFILEINFO();
+        IntPtr result = SHGetFileInfo(
+            probe,
+            FILE_ATTRIBUTE_NORMAL,
+            ref info,
+            (uint)Marshal.SizeOf(info),
+            SHGFI_SYSICONINDEX | SHGFI_LARGEICON | SHGFI_USEFILEATTRIBUTES);
+        if (result == IntPtr.Zero)
         {
-            IntPtr imageList;
-            if (SHGetImageList(size, ref IID_IImageList, out imageList) == 0 && imageList != IntPtr.Zero)
-            {
-                IntPtr handle = ImageList_GetIcon(imageList, info.iIcon, 0);
-                if (handle != IntPtr.Zero)
-                {
-                    Icon icon = (Icon)Icon.FromHandle(handle).Clone();
-                    DestroyIcon(handle);
-                    return icon;
-                }
-            }
+            return null;
         }
 
-        return null;
+        return FromImageList(info.iIcon);
     }
 
     public static Bitmap ToTrimmedBitmap(Icon icon)
@@ -213,11 +254,50 @@ function Get-IconSource {
     return @{ Source = $source; Index = $index }
 }
 
+function Convert-IconToBase64($icon) {
+    try {
+        $bitmap = [MacExplorerShellIcon]::ToTrimmedBitmap($icon)
+        if ($bitmap.Width -lt 16 -or $bitmap.Height -lt 16) {
+            $bitmap.Dispose()
+            return $null
+        }
+        $stream = New-Object System.IO.MemoryStream
+        $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
+        $value = [Convert]::ToBase64String($stream.ToArray())
+        $stream.Dispose()
+        $bitmap.Dispose()
+        return $value
+    } catch {
+        return $null
+    }
+}
+
+# Types whose "system default" icon is meaningful even without the file itself.
+$appExtensions = @('.exe', '.lnk', '.url', '.msi', '.msix', '.com', '.bat', '.cmd', '.scr', '.appref-ms')
+
+function Get-TypeIcon([string]$target) {
+    $extension = [System.IO.Path]::GetExtension($target)
+    if (-not $extension) { return $null }
+    if ($appExtensions -notcontains $extension.ToLowerInvariant()) { return $null }
+    try {
+        return [MacExplorerShellIcon]::GetTypeIcon($extension)
+    } catch {
+        return $null
+    }
+}
+
 foreach ($item in $paths) {
     $p = [string]$item
     try {
         if (-not (Test-Path -LiteralPath $p)) {
-            $result[$p] = $null
+            # A shortcut pointing at nothing still deserves the shell's own
+            # application glyph rather than a blank page.
+            $typeIcon = Get-TypeIcon $p
+            if ($typeIcon) {
+                $result[$p] = Convert-IconToBase64 $typeIcon
+            } else {
+                $result[$p] = $null
+            }
             continue
         }
 
@@ -239,23 +319,14 @@ foreach ($item in $paths) {
             $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($source)
         }
         if (-not $icon) {
+            $icon = Get-TypeIcon $p
+        }
+        if (-not $icon) {
             $result[$p] = $null
             continue
         }
 
-        $bitmap = [MacExplorerShellIcon]::ToTrimmedBitmap($icon)
-        if ($bitmap.Width -lt 16 -or $bitmap.Height -lt 16) {
-            $result[$p] = $null
-            $bitmap.Dispose()
-            $icon.Dispose()
-            continue
-        }
-
-        $stream = New-Object System.IO.MemoryStream
-        $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
-        $result[$p] = [Convert]::ToBase64String($stream.ToArray())
-        $stream.Dispose()
-        $bitmap.Dispose()
+        $result[$p] = Convert-IconToBase64 $icon
         $icon.Dispose()
     } catch {
         $result[$p] = $null

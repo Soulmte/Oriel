@@ -5,6 +5,7 @@ import {
   SFDesktopcomputer,
   SFExternaldriveFill,
   SFInfoCircle,
+  SFGearshapeFill,
   SFLine3Horizontal,
   SFListBullet,
 } from "sf-symbols-lib/dualtone";
@@ -14,8 +15,9 @@ import { SettingsBrowsing } from "./settings/SettingsBrowsing";
 import { SettingsContextMenu } from "./settings/SettingsContextMenu";
 import { SettingsService } from "./settings/SettingsService";
 import { SettingsAbout } from "./settings/SettingsAbout";
+import { SettingsSystem } from "./settings/SettingsSystem";
 
-type SectionId = "appearance" | "browsing" | "menu" | "service" | "about";
+type SectionId = "appearance" | "browsing" | "menu" | "system" | "service" | "about";
 
 const SECTIONS: Array<{
   id: SectionId;
@@ -25,6 +27,7 @@ const SECTIONS: Array<{
   { id: "appearance", label: "外观", Icon: SFDesktopcomputer },
   { id: "browsing", label: "浏览", Icon: SFListBullet },
   { id: "menu", label: "右键菜单", Icon: SFLine3Horizontal },
+  { id: "system", label: "系统", Icon: SFGearshapeFill },
   { id: "service", label: "本地服务", Icon: SFExternaldriveFill },
   { id: "about", label: "关于", Icon: SFInfoCircle },
 ];
@@ -95,6 +98,7 @@ export function SettingsPage() {
           {section === "appearance" && <SettingsAppearance />}
           {section === "browsing" && <SettingsBrowsing />}
           {section === "menu" && <SettingsContextMenu />}
+          {section === "system" && <SettingsSystem />}
           {section === "service" && <SettingsService />}
           {section === "about" && <SettingsAbout />}
         </div>

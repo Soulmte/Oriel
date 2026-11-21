@@ -1,6 +1,6 @@
 {
   "name": "oriel",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "A Finder-style file manager for Windows — Tauri 2 + React 19 + local Fastify service",
@@ -16,11 +16,12 @@
     "dev:all": "concurrently -k -n server,web,app -c cyan,green,magenta \"npm:dev:server\" \"npm:dev:web\" \"npm:dev:desktop\"",
     "build": "npm run build -w @oriel/server && vite build",
     "build:web": "vite build",
-    "build:desktop": "vite build && tauri build",
+    "build:desktop": "node scripts/pack-sidecar.mjs && vite build && tauri build",
     "preview": "vite preview",
     "typecheck": "npm run typecheck -w @oriel/server && tsc --noEmit",
     "smoke": "npm run smoke -w @oriel/server",
-    "icon": "tauri icon src-tauri/app-icon.png"
+    "icon": "tauri icon src-tauri/app-icon.png",
+    "pack:sidecar": "node scripts/pack-sidecar.mjs"
   },
   "dependencies": {
     "@heroui/react": "^3.2.7",

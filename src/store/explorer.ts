@@ -93,6 +93,8 @@ export interface ToastMessage {
   message: string;
 }
 
+export type SearchScope = "folder" | "disk" | "all";
+
 export interface ContextMenuState {
   x: number;
   y: number;
@@ -196,6 +198,8 @@ interface ExplorerState {
   emptyRecycle: () => Promise<void>;
 
   query: string;
+  /** How wide search reaches: the open folder, its disk, or every drive. */
+  searchScope: SearchScope;
   results: EntryDto[] | null;
   searching: boolean;
   searchTruncated: boolean;
@@ -271,6 +275,7 @@ interface ExplorerState {
   reveal: (target: string) => Promise<void>;
 
   setQuery: (query: string) => void;
+  setSearchScope: (scope: SearchScope) => void;
   loadShellIcons: (entries: EntryDto[]) => Promise<void>;
   /** Queues folder sizes; calls inside one tick are batched into one request. */
   requestFolderSizes: (paths: string[]) => void;
@@ -307,6 +312,16 @@ interface ExplorerState {
 }
 
 const LAST_PATH_KEY = "oriel:last-path";
+
+function readSearchScope(): SearchScope {
+  try {
+    const raw = localStorage.getItem(PREF.searchScope);
+    if (raw === "disk" || raw === "all" || raw === "folder") return raw;
+  } catch {
+    // Fall through to the default.
+  }
+  return "folder";
+}
 
 /** In-memory shell icon entries kept per session before evicting the oldest. */
 const MAX_SHELL_ICONS = 800;
@@ -369,6 +384,7 @@ const PREF = {
   showHidden: "oriel:pref-show-hidden",
   startLocation: "oriel:pref-start-location",
   preview: "oriel:pref-preview",
+  searchScope: "oriel:pref-search-scope",
   group: "oriel:pref-group",
 } as const;
 
@@ -660,6 +676,7 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
   recycle: { items: [], total: 0, loading: false, skippedDrives: [] },
 
   query: "",
+  searchScope: readSearchScope(),
   results: null,
   searching: false,
   searchScanned: 0,
@@ -1199,6 +1216,17 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
     }
   },
 
+  setSearchScope(scope) {
+    set({ searchScope: scope });
+    try {
+      localStorage.setItem(PREF.searchScope, scope);
+    } catch {
+      // Remembering the scope is best effort.
+    }
+    // Re-run the current search under the new scope.
+    if (get().query.trim()) get().setQuery(get().query);
+  },
+
   setQuery(query) {
     set({ query });
 
@@ -1230,7 +1258,7 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
 
       const collected: EntryDto[] = [];
       const source = new EventSource(
-        api.searchStreamUrl(pathAtStart, trimmed, get().showHidden),
+        api.searchStreamUrl(pathAtStart, trimmed, get().showHidden, get().searchScope),
       );
       searchSource = source;
 

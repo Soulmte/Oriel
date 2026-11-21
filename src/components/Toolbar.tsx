@@ -21,6 +21,7 @@ import {
   SFChevronLeft,
   SFChevronRight,
   SFChevronUp,
+  SFExternaldriveFill,
   SFEllipsis,
   SFEye,
   SFFolderBadgePlus,
@@ -37,6 +38,7 @@ import {
 import { Loader2 } from "lucide-react";
 import { FormatIcon } from "../lib/fileIcons";
 import type { SortKey, ViewMode } from "@oriel/shared";
+import type { SearchScope } from "../store/explorer";
 import { useExplorer } from "../store/explorer";
 import { GROUP_LABELS } from "../lib/grouping";
 import type { GroupKey } from "../lib/grouping";
@@ -99,6 +101,12 @@ const SORT_LABELS: Record<SortKey, string> = {
 };
 
 const SORT_KEYS = Object.keys(SORT_LABELS) as SortKey[];
+
+const SEARCH_SCOPE_LABELS: Record<SearchScope, string> = {
+  folder: "当前文件夹",
+  disk: "此磁盘",
+  all: "所有磁盘",
+};
 const GROUP_KEYS = Object.keys(GROUP_LABELS) as GroupKey[];
 
 function IconButton({
@@ -166,6 +174,8 @@ export function Toolbar() {
   const setGroup = useExplorer((state) => state.setGroup);
   const query = useExplorer((state) => state.query);
   const setQuery = useExplorer((state) => state.setQuery);
+  const searchScope = useExplorer((state) => state.searchScope);
+  const setSearchScope = useExplorer((state) => state.setSearchScope);
   const searching = useExplorer((state) => state.searching);
   const openDialog = useExplorer((state) => state.openDialog);
   const goBack = useExplorer((state) => state.goBack);
@@ -418,6 +428,37 @@ export function Toolbar() {
       </Dropdown>
 
       <div className="ml-auto flex min-w-0 items-center gap-2">
+        <Dropdown>
+          <Button
+            size="sm"
+            variant="ghost"
+            className={TOOL_BUTTON_CLASS}
+            aria-label={`搜索范围：${SEARCH_SCOPE_LABELS[searchScope]}`}
+          >
+            {searchScope === "folder" ? (
+              <SFFolderBadgePlus size={14} />
+            ) : (
+              <SFExternaldriveFill size={14} />
+            )}
+            {showLabels && (
+              <span className="whitespace-nowrap">{SEARCH_SCOPE_LABELS[searchScope]}</span>
+            )}
+            <SFChevronDown size={9} className="opacity-55" />
+          </Button>
+          <Dropdown.Popover placement="bottom end" className="min-w-[184px]">
+            <Dropdown.Menu onAction={(key) => setSearchScope(String(key) as SearchScope)}>
+              {(Object.keys(SEARCH_SCOPE_LABELS) as SearchScope[]).map((scope) => (
+                <Dropdown.Item key={scope} id={scope} textValue={SEARCH_SCOPE_LABELS[scope]}>
+                  <Label>{SEARCH_SCOPE_LABELS[scope]}</Label>
+                  {searchScope === scope && (
+                    <SFCheckmark size={14} className="ml-auto text-muted" />
+                  )}
+                </Dropdown.Item>
+              ))}
+            </Dropdown.Menu>
+          </Dropdown.Popover>
+        </Dropdown>
+
         <Dropdown>
           <Button
             isIconOnly
