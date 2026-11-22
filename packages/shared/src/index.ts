@@ -198,8 +198,12 @@ export interface UpdateInfoDto {
   /** True when `latest` is newer than `current`. */
   newer: boolean;
   url: string | null;
+  /** Release title from GitHub/Gitee, e.g. `Oriel 0.1.2`. */
+  releaseName?: string | null;
   /** Release notes in Markdown. */
   notes: string | null;
+  /** GitHub compare link for this release, when the body carried one. */
+  compareUrl?: string | null;
   publishedAt: string | null;
   assets: UpdateAssetDto[];
   error?: string;
@@ -239,6 +243,52 @@ export interface PortListResponse {
   platform: string;
   /** Populated when the platform cannot enumerate endpoints. */
   note: string | null;
+}
+
+/** One running process, from the Windows process manager. */
+export interface ProcessEntryDto {
+  pid: number;
+  ppid: number;
+  /** Image name with extension, e.g. `chrome.exe`. */
+  name: string;
+  /** Full image path when Windows exposes it. */
+  path: string | null;
+  /** Working set in bytes. */
+  memory: number;
+  threads: number;
+  /** Kernel + user milliseconds; the client derives CPU% between samples. */
+  cpuMs: number;
+  /** Milliseconds since the Unix epoch. */
+  startedMs: number;
+  /** Command line, best effort (needs PROCESS_VM_READ). */
+  cmdline: string | null;
+  /** True for system images the app refuses to end. */
+  protected: boolean;
+  /** True for the service that powers Oriel itself. */
+  oriel: boolean;
+}
+
+export interface ProcessListResponse {
+  items: ProcessEntryDto[];
+  servicePid: number;
+}
+
+/** One process holding a handle on a file, via the Windows Restart Manager. */
+export interface LockEntryDto {
+  pid: number;
+  name: string;
+  path: string | null;
+  appType: "window" | "service" | "console" | "explorer" | "critical" | "unknown";
+  /** Service short name for services, e.g. `wuauserv`. */
+  service: string | null;
+  restartable: boolean;
+  protected: boolean;
+  oriel: boolean;
+}
+
+export interface LockListResponse {
+  path: string;
+  items: LockEntryDto[];
 }
 
 export const SEARCH_MIN_QUERY_LENGTH = 1;

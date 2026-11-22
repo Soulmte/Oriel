@@ -6,6 +6,7 @@ import { useExplorer } from "../store/explorer";
 import { groupEntries } from "../lib/grouping";
 import { useInView } from "../hooks/useInView";
 import { useVirtualRows } from "../hooks/useVirtualRows";
+import { useMarqueeSelection } from "../hooks/useMarquee";
 import { useDropTarget } from "../hooks/useDropTarget";
 import {
   displayName,
@@ -124,6 +125,7 @@ function ListRow({
   return (
     <div
       data-entry
+      data-entry-path={entry.path}
       data-selected={isSelected}
       draggable
       style={{ height: rowHeight }}
@@ -210,6 +212,7 @@ export function FileList({ entries }: { entries: EntryDto[] }) {
   const sortDir = useExplorer((state) => state.sortDir);
   const setSort = useExplorer((state) => state.setSort);
   const selected = useExplorer((state) => state.selected);
+  const selectPaths = useExplorer((state) => state.selectPaths);
   const clearSelection = useExplorer((state) => state.clearSelection);
   const setContextMenu = useExplorer((state) => state.setContextMenu);
   const dropPaths = useExplorer((state) => state.dropPaths);
@@ -256,6 +259,13 @@ export function FileList({ entries }: { entries: EntryDto[] }) {
   const virtual = useVirtualRows({ count: rowModel.length, rowHeight: ROW_HEIGHT });
   const columns = columnsFor(containerWidth);
   const { ref, onScroll, first, last, rows } = virtual;
+
+  const getSelection = useCallback(() => useExplorer.getState().selected, []);
+  const marquee = useMarqueeSelection({
+    containerRef: ref,
+    getSelection,
+    onSelect: selectPaths,
+  });
 
   useLayoutEffect(() => {
     const node = ref.current;
@@ -354,7 +364,7 @@ export function FileList({ entries }: { entries: EntryDto[] }) {
       <div
         ref={ref}
         onScroll={handleScroll}
-        className="min-h-0 flex-1 overflow-auto"
+        className="relative min-h-0 flex-1 overflow-auto"
         onClick={(event) => {
           if ((event.target as HTMLElement).closest("[data-entry]")) return;
           clearSelection();
@@ -405,6 +415,19 @@ export function FileList({ entries }: { entries: EntryDto[] }) {
 
           {last < rows && <div style={{ height: (rows - last) * ROW_HEIGHT }} />}
         </div>
+
+        {marquee && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute z-20 rounded-[2px] border border-mac-blue/80 bg-mac-blue/15"
+            style={{
+              left: marquee.left,
+              top: marquee.top,
+              width: marquee.width,
+              height: marquee.height,
+            }}
+          />
+        )}
       </div>
     </div>
   );

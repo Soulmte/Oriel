@@ -4,9 +4,13 @@ import type { ConflictPolicy } from "@oriel/shared";
 import { useExplorer } from "../store/explorer";
 import { basename, fileKindLabel, formatBytes, formatDate } from "../lib/format";
 import { FileIcon, FormatIcon } from "../lib/fileIcons";
+import { PropertiesPanel } from "./PropertiesPanel";
+import { LocksDialog } from "./LocksDialog";
 
 /** macOS alert shape: a small sheet, a centred title, buttons bottom-right. */
 const DIALOG = "w-[452px] max-w-[452px] gap-0! rounded-[12px] p-0!";
+/** Process lists need one more column than an alert. */
+const DIALOG_WIDE = "w-[566px] max-w-[566px] gap-0! rounded-[12px] p-0!";
 const HEADER = "justify-center px-5 pb-0 pt-4";
 const HEADING = "text-center text-[13px] font-semibold text-mac-text";
 const BODY = "px-5 pb-0 pt-3";
@@ -89,6 +93,8 @@ export function Dialogs() {
   // two backdrops fighting over the focus trap.
   const isOpen = dialog !== null && dialog.kind !== "batch-rename";
   const errorDialog = dialog?.kind === "error" ? dialog : null;
+  const propertiesDialog = dialog?.kind === "properties" ? dialog : null;
+  const locksDialog = dialog?.kind === "locks" ? dialog : null;
   const conflictDialog = dialog?.kind === "conflict" ? dialog : null;
   const removeDialog = dialog?.kind === "confirm-remove" ? dialog : null;
   const purgeDialog = dialog?.kind === "confirm-purge" ? dialog : null;
@@ -135,8 +141,15 @@ export function Dialogs() {
       }}
     >
       <Modal.Container placement="center">
-        <Modal.Dialog className={DIALOG}>
-          {errorDialog ? (
+        <Modal.Dialog className={locksDialog ? DIALOG_WIDE : DIALOG}>
+          {locksDialog ? (
+            <LocksDialog path={locksDialog.path} onClose={closeDialog} />
+          ) : propertiesDialog ? (
+            <PropertiesPanel
+              paths={propertiesDialog.paths}
+              onClose={closeDialog}
+            />
+          ) : errorDialog ? (
             <>
               <Modal.Header className={HEADER}>
                 <Modal.Heading className={HEADING}>操作失败</Modal.Heading>

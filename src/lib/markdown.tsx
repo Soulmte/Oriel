@@ -11,7 +11,7 @@ import type { ReactNode } from "react";
  */
 
 const INLINE_PATTERN =
-  /(`[^`]+`)|(\*\*[^*]+\*\*)|(__[^_]+__)|(\*[^*]+\*)|(_[^_]+_)|(\[[^\]]+\]\([^)]+\))/g;
+  /(`[^`]+`)|(\*\*[^*]+\*\*)|(__[^_]+__)|(\*[^*]+\*)|(_[^_]+_)|(\[[^\]]+\]\([^)]+\))|(https?:\/\/[^\s<>"']+)/g;
 
 function renderLink(raw: string, key: string): ReactNode {
   const match = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(raw);
@@ -28,6 +28,25 @@ function renderLink(raw: string, key: string): ReactNode {
     >
       {label}
     </a>
+  );
+}
+
+/** Bare URLs in release notes (GitHub appends them) become real links. */
+function renderBareLink(raw: string, key: string): ReactNode {
+  const href = raw.replace(/[.,;:!?）\]]+$/, "");
+  const trailing = raw.slice(href.length);
+  return (
+    <Fragment key={key}>
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer noopener"
+        className="text-mac-blue underline decoration-mac-blue/40 underline-offset-2 hover:decoration-mac-blue [overflow-wrap:anywhere]"
+      >
+        {href.replace(/^https?:\/\//, "")}
+      </a>
+      {trailing}
+    </Fragment>
   );
 }
 
@@ -60,6 +79,8 @@ function renderInline(text: string, prefix: string): ReactNode[] {
       );
     } else if (token.startsWith("*") || token.startsWith("_")) {
       nodes.push(<em key={key}>{renderInline(token.slice(1, -1), key)}</em>);
+    } else if (/^https?:\/\//i.test(token)) {
+      nodes.push(renderBareLink(token, key));
     } else {
       nodes.push(renderLink(token, key));
     }

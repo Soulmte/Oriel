@@ -41,6 +41,7 @@ export const BUILTIN_MENU_ITEMS: Array<{
 }> = [
   { id: "open", label: "打开", scope: "entry" },
   { id: "show-info", label: "显示简介", scope: "entry" },
+  { id: "file-locks", label: "查看占用进程", scope: "entry" },
   { id: "properties", label: "属性…", scope: "entry" },
   { id: "copy", label: "复制", scope: "entry" },
   { id: "cut", label: "剪切", scope: "entry" },

@@ -58,6 +58,9 @@ export function TitleBar() {
   const title = useMemo(() => {
     if (route === "settings") return "设置";
     if (route === "recycle") return "废纸篓";
+    if (route === "home") return "首页";
+    if (route === "processes") return "进程管理器";
+    if (route === "ports") return "端口进程";
     if (!displayPath) return "Oriel";
     if (isArchivePath(displayPath)) {
       const { archive, inner } = parseArchivePath(displayPath);

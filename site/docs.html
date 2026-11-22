@@ -39,6 +39,7 @@
         <ol>
           <li><a href="#install">安装</a></li>
           <li><a href="#first-run">第一次打开</a></li>
+          <li><a href="#home">首页</a></li>
           <li><a href="#panes">分区查看</a></li>
           <li><a href="#shortcuts">常用快捷键</a></li>
           <li><a href="#search">搜索</a></li>
@@ -86,14 +87,31 @@
               右键菜单分文件、文件夹和空白处三套，可以在「设置 → 右键菜单」里逐项开关。
             </li>
             <li>每个文件夹会记住自己的视图、排序、分组和滚动位置。</li>
+            <li>在空白处按住左键拖动可以框选多个项目，按住 <kbd>Ctrl</kbd> 拖动则追加选择。</li>
+          </ul>
+        </section>
+
+        <section id="home">
+          <h2>首页</h2>
+          <p>
+            侧边栏最上方的「首页」把每天要用的东西放在一页：常用位置、
+            各磁盘的剩余容量，以及最近打开过的文件夹。点卡片就能进去。
+          </p>
+          <ul>
+            <li>常用位置、磁盘和最近打开各是一组，点击即打开对应文件夹。</li>
+            <li>磁盘卡片上的进度条是真实占用，接近满了会变成橙色。</li>
+            <li>
+              想让每次启动都停在首页：`设置 → 浏览 → 启动位置` 选「首页」。
+              默认仍是上次停留的位置。
+            </li>
           </ul>
         </section>
 
         <section id="panes">
           <h2>分区查看</h2>
           <p>
-            把两个文件夹放在一起看：工具栏「更多」→「分区：左右两格」，
-            或「四宫格」。分区条上随时可以切回单窗格。
+            把两个文件夹放在一起看：工具栏一级的「分区」分段控件可以选单窗格、
+            左右两栏、三栏或四象限，切回完整视图也在同一个控件上。
           </p>
           <ul>
             <li>每个窗格独立导航、视图、排序和选择，互不影响。</li>
@@ -119,6 +137,7 @@
               <tr><td>搜索</td><td><kbd>Ctrl</kbd> + <kbd>F</kbd></td></tr>
               <tr><td>编辑地址栏</td><td><kbd>Ctrl</kbd> + <kbd>L</kbd></td></tr>
               <tr><td>预览选中项</td><td><kbd>空格</kbd></td></tr>
+              <tr><td>显示简介</td><td><kbd>Ctrl</kbd> + <kbd>I</kbd></td></tr>
               <tr><td>打开</td><td><kbd>Enter</kbd></td></tr>
               <tr><td>上一级</td><td><kbd>Backspace</kbd></td></tr>
               <tr><td>前进 / 后退</td><td><kbd>Ctrl</kbd> + <kbd>[</kbd> / <kbd>]</kbd></td></tr>

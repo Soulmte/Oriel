@@ -39,8 +39,9 @@ import {
 import { Loader2 } from "lucide-react";
 import { FormatIcon } from "../lib/fileIcons";
 import type { SortKey, ViewMode } from "@oriel/shared";
-import type { SearchScope } from "../store/explorer";
+import type { SearchScope, PaneLayout } from "../store/explorer";
 import { useExplorer } from "../store/explorer";
+import { LayoutSwitcher } from "./LayoutSwitcher";
 import { GROUP_LABELS } from "../lib/grouping";
 import type { GroupKey } from "../lib/grouping";
 import { DENSITY_LABELS, GRID_SIZE_LABELS } from "../lib/appearance";
@@ -196,6 +197,8 @@ export function Toolbar() {
   const setAppearance = useExplorer((state) => state.setAppearance);
   const layout = useExplorer((state) => state.layout);
   const setLayout = useExplorer((state) => state.setLayout);
+  const exitPanes = useExplorer((state) => state.exitPanes);
+  const paneActivePath = useExplorer((state) => state.paneActivePath);
 
   /** Collapse text labels when the window (or the UI scale) gets narrow. */
   const bar = useRef<HTMLDivElement>(null);
@@ -250,12 +253,6 @@ export function Toolbar() {
         case "refresh":
           reload();
           break;
-        case "layout-2":
-          setLayout("2");
-          break;
-        case "layout-4":
-          setLayout("4");
-          break;
         case "settings":
           openSettings();
           break;
@@ -268,10 +265,20 @@ export function Toolbar() {
       path,
       reload,
       reveal,
-      setLayout,
       setShowHidden,
       showHidden,
     ],
+  );
+
+  const applyLayout = useCallback(
+    (next: PaneLayout) => {
+      if (next === "1") {
+        exitPanes(paneActivePath || path);
+        return;
+      }
+      setLayout(next);
+    },
+    [exitPanes, paneActivePath, path, setLayout],
   );
 
   const handleViewOption = (key: Key) => {
@@ -446,6 +453,8 @@ export function Toolbar() {
         </Dropdown.Popover>
       </Dropdown>
 
+      <LayoutSwitcher layout={layout} onPick={applyLayout} />
+
       <div className="ml-auto flex min-w-0 items-center gap-2">
         <Dropdown>
           <Button
@@ -602,15 +611,6 @@ export function Toolbar() {
               <Dropdown.Item id="copy-path" textValue="复制当前路径" isDisabled={!path}>
                 <SFLink size={14} className="shrink-0 text-muted" />
                 <Label>复制当前路径</Label>
-              </Dropdown.Item>
-              <Separator />
-              <Dropdown.Item id="layout-2" textValue="双窗格（左右）">
-                <Label>分区：左右两格</Label>
-                {layout === "2" && <SFCheckmark size={14} className="ml-auto text-muted" />}
-              </Dropdown.Item>
-              <Dropdown.Item id="layout-4" textValue="四窗格">
-                <Label>分区：四宫格</Label>
-                {layout === "4" && <SFCheckmark size={14} className="ml-auto text-muted" />}
               </Dropdown.Item>
               <Separator />
               <Dropdown.Item id="refresh" textValue="刷新">

@@ -34,17 +34,6 @@ jobs:
           npm run typecheck
           npm run smoke
 
-      - name: Build service and web bundle
-        run: npm run build
-
-      - name: Package service (sidecar payload)
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force dist-server | Out-Null
-          Copy-Item server/dist -Destination dist-server -Recurse
-          Copy-Item package.json, package-lock.json, packages -Destination dist-server -Recurse
-          Compress-Archive -Path dist-server/* -DestinationPath oriel-server.zip -Force
-
       - name: Build desktop installer
         run: npm run build:desktop
 
@@ -63,7 +52,6 @@ jobs:
           # Re-running the job must replace the previous assets, not fail on them.
           overwrite_files: true
           files: |
-            oriel-server.zip
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
           generate_release_notes: true

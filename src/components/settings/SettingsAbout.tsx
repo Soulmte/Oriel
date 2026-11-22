@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@heroui/react";
-import { SFArrowCounterclockwise } from "sf-symbols-lib/dualtone";
+import { SFArrowCounterclockwise, SFChevronRight } from "sf-symbols-lib/dualtone";
 import { APP_VERSION } from "@oriel/shared";
 import type { UpdateInfoDto } from "@oriel/shared";
 import { useExplorer } from "../../store/explorer";
@@ -11,6 +11,31 @@ import { formatBytes } from "../../lib/format";
 import { Markdown } from "../../lib/markdown";
 import { SettingsPageHeader, SettingsRow, SettingsSection } from "./shared";
 
+/**
+ * GitHub appends `**Full Changelog**: <url>` to every generated release. That
+ * line reads as raw text inside a note card, so pull it out and let the UI
+ * render it as a proper “查看完整变更” action.
+ */
+function splitReleaseNotes(raw: string): {
+  body: string;
+  compareUrl: string | null;
+} {
+  const lines = raw.replace(/\r\n/g, "\n").split("\n");
+  const kept: string[] = [];
+  let compareUrl: string | null = null;
+
+  for (const line of lines) {
+    const match = /^\s*(?:\*\*)?Full Changelog(?:\*\*)?\s*:\s*(\S+)\s*$/i.exec(line);
+    if (match) {
+      compareUrl = match[1].replace(/[.,;]+$/, "");
+      continue;
+    }
+    kept.push(line);
+  }
+
+  return { body: kept.join("\n").trim(), compareUrl };
+}
+
 export function SettingsAbout() {
   const resetPreferences = useExplorer((state) => state.resetPreferences);
   const resetContextMenuPrefs = useExplorer((state) => state.resetContextMenuPrefs);
@@ -20,6 +45,7 @@ export function SettingsAbout() {
   const [update, setUpdate] = useState<UpdateInfoDto | null>(null);
   const [checking, setChecking] = useState(false);
   const [downloadId, setDownloadId] = useState<string | null>(null);
+  const [showLatestNotes, setShowLatestNotes] = useState(false);
 
   const tasks = useExplorer((state) => state.tasks);
   const taskSpeeds = useExplorer((state) => state.taskSpeeds);
@@ -58,6 +84,25 @@ export function SettingsAbout() {
     void check();
   }, []);
 
+  const notes = useMemo(
+    () => splitReleaseNotes(update?.notes ?? ""),
+    [update?.notes],
+  );
+  const notesBody = notes.body;
+  const compareUrl = update?.compareUrl ?? notes.compareUrl;
+
+  // GitHub titles look like “Oriel 0.1.2”; skip it when the tag already says that.
+  const releaseLabel = useMemo(() => {
+    const name = update?.releaseName?.trim();
+    if (!name || !update?.latest) return null;
+    return name.toLowerCase().includes(update.latest.toLowerCase()) ? null : name;
+  }, [update?.releaseName, update?.latest]);
+
+  // A fresh check can land on another release; keep the old notes collapsed.
+  useEffect(() => {
+    setShowLatestNotes(false);
+  }, [update?.latest]);
+
   const status = (() => {
     if (!update) return "正在检查…";
     if (!update.configured) return "未配置更新源";
@@ -65,6 +110,35 @@ export function SettingsAbout() {
     if (update.newer && update.latest) return `发现新版本 ${update.latest}`;
     return "已是最新版本";
   })();
+
+  const compareAction = compareUrl ? (
+    <button
+      type="button"
+      onClick={() => void api.openPath(compareUrl)}
+      className="shrink-0 text-[11px] text-mac-blue hover:underline"
+    >
+      查看完整变更
+    </button>
+  ) : null;
+
+  const notesContent = notesBody ? (
+    <div className="max-h-[260px] overflow-y-auto overflow-x-hidden rounded-[8px] border border-mac-line bg-black/[0.02] px-3 py-2 text-[12px] text-mac-text [overflow-wrap:anywhere] dark:bg-white/[0.03]">
+      <Markdown text={notesBody} />
+    </div>
+  ) : (
+    <div className="rounded-[8px] border border-mac-line bg-black/[0.02] px-3 py-2.5 text-[11.5px] leading-5 text-mac-muted dark:bg-white/[0.03]">
+      这个版本没有填写更新说明。
+      {update?.url && (
+        <button
+          type="button"
+          onClick={() => void api.openPath(update.url as string)}
+          className="ml-1 text-mac-blue hover:underline"
+        >
+          到发布页查看
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -106,7 +180,7 @@ export function SettingsAbout() {
         </SettingsRow>
 
         {update && !update.configured && (
-          <div className="py-3 text-[12px] leading-5 text-mac-muted">
+          <div className="px-3.5 py-3 text-[12px] leading-5 text-mac-muted">
             尚未配置更新源。启动服务时设置环境变量
             <code className="mx-1 rounded bg-black/[0.05] px-1.5 py-0.5 font-mono text-[11px] dark:bg-white/[0.07]">
               ORIEL_UPDATE_REPO=owner/repo
@@ -116,24 +190,33 @@ export function SettingsAbout() {
         )}
 
         {update?.configured && update.error && (
-          <div className="py-3 text-[12px] leading-5 text-[#ff9f0a]">
+          <div className="px-3.5 py-3 text-[12px] leading-5 text-[#ff9f0a]">
             检查失败：{update.error}
           </div>
         )}
 
         {update?.configured && !update.error && update.latest && (
-          <div className="border-b border-mac-line py-3">
-            <div className="flex items-center gap-2 text-[12.5px]">
-              <span className="text-mac-text">
-                {update.newer ? `新版本 ${update.latest}` : "已是最新版本"}
+          <div className="min-w-0 border-b border-mac-line px-3.5 py-3">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-[13px] font-medium text-mac-text">
+                {update.newer ? `发现新版本 v${update.latest}` : "已是最新版本"}
               </span>
-              <span className="text-mac-muted">当前 v{update.current}</span>
-              {update.publishedAt && (
-                <span className="text-mac-muted">
-                  · {new Date(update.publishedAt).toLocaleDateString()}
+              <span className="rounded-[4px] bg-black/[0.06] px-1.5 py-0.5 text-[10.5px] tabular-nums text-mac-muted dark:bg-white/10">
+                当前 v{update.current}
+              </span>
+              {update.newer && (
+                <span className="rounded-[4px] bg-mac-blue/10 px-1.5 py-0.5 text-[10.5px] font-medium text-mac-blue">
+                  有可用更新
                 </span>
               )}
             </div>
+
+            <p className="mt-1 text-[11.5px] text-mac-muted">
+              {update.newer ? "最新发布" : "最近发布"} v{update.latest}
+              {update.publishedAt
+                ? ` · ${new Date(update.publishedAt).toLocaleDateString()}`
+                : ""}
+            </p>
 
             {update.newer && primaryAsset && (
               <div className="mt-3 flex flex-col gap-2">
@@ -226,21 +309,62 @@ export function SettingsAbout() {
               </div>
             )}
 
-            {update.notes && (
-              <div className="mt-3">
-                <div className="mb-1 text-[11.5px] font-medium text-mac-muted">
-                  更新日志
+            {update.newer ? (
+              <div className="mt-3.5">
+                <div className="mb-1.5 flex items-baseline justify-between gap-3">
+                  <span className="text-[11.5px] font-medium text-mac-muted">
+                    {releaseLabel ?? `v${update.latest}`} 更新内容
+                  </span>
+                  {compareAction}
                 </div>
-                <div className="max-h-[240px] overflow-y-auto rounded-[8px] border border-mac-line bg-black/[0.02] px-3 py-2 text-[12px] text-mac-text dark:bg-white/[0.03]">
-                  <Markdown text={update.notes} />
+                {notesContent}
+              </div>
+            ) : (
+              <div className="mt-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    aria-expanded={showLatestNotes}
+                    onClick={() => setShowLatestNotes((value) => !value)}
+                    className="flex items-center gap-1 text-[11.5px] text-mac-muted transition-colors hover:text-mac-text"
+                  >
+                    <SFChevronRight
+                      size={11}
+                      className={
+                        showLatestNotes
+                          ? "rotate-90 transition-transform"
+                          : "transition-transform"
+                      }
+                    />
+                    最近版本 {releaseLabel ?? `v${update.latest}`} 的更新说明
+                  </button>
+                  {compareAction}
                 </div>
+                {showLatestNotes && <div className="mt-2">{notesContent}</div>}
               </div>
             )}
 
-            {update.assets.length > 1 && (
-              <div className="mt-2 text-[11.5px] leading-5 text-mac-muted">
-                发布包含 {update.assets.length} 个文件：
-                {update.assets.map((asset) => asset.name).join("、")}
+            {update.assets.length > 0 && (
+              <div className="mt-3">
+                <div className="text-[11px] font-medium text-mac-muted">
+                  发布文件
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {update.assets.map((asset) => (
+                    <span
+                      key={asset.name}
+                      title={asset.url}
+                      className="max-w-full truncate rounded-[5px] bg-black/[0.045] px-2 py-1 font-mono text-[10.5px] text-mac-text dark:bg-white/[0.06]"
+                    >
+                      {asset.name}
+                      {asset.size > 0 && (
+                        <span className="ml-1 font-sans text-mac-muted">
+                          {formatBytes(asset.size)}
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </div>

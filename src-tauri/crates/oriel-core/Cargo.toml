@@ -1,0 +1,12 @@
+[package]
+name = "oriel-core"
+version.workspace = true
+edition.workspace = true
+description = "Native file-system, search, icon and port primitives for Oriel"
+
+[dependencies]
+serde.workspace = true
+windows.workspace = true
+png = "0.17"
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "bmp", "webp", "tiff"] }

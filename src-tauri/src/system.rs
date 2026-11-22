@@ -1,15 +1,14 @@
 //! Everything the packaged app needs from the OS itself.
 //!
 //! The web UI is only half of a file manager: the service that reads the disk
-//! has to be running before the window is useful, the window has to survive a
-//! close-to-tray, and Windows has to be told that Oriel exists as a handler.
-//! This module owns that: it boots the bundled Node service, keeps its process
-//! handle, exposes tray/autostart/handler toggles as commands, and cleans up on
-//! exit.
+//! has to run before the window is useful, the window has to survive a close to
+//! tray, and Windows has to be told that Oriel exists as a handler. This module
+//! owns that: it boots the embedded Rust service, exposes tray/autostart/handler
+//! toggles as commands, and keeps the shell integration together.
 
 use std::net::TcpStream;
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -18,9 +17,6 @@ use serde::{Deserialize, Serialize};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, State, WindowEvent};
-
-/// Holds the bundled service process so it can be killed on exit.
-pub struct ServiceProcess(pub Mutex<Option<Child>>);
 
 /// Tray icon handle, kept so the UI can hide/show it at runtime.
 pub struct TrayHandle(pub Mutex<Option<TrayIcon>>);
@@ -98,16 +94,47 @@ fn api_ready(port: u16) -> bool {
     TcpStream::connect_timeout(&socket, Duration::from_millis(180)).is_ok()
 }
 
-/// The service is bundled next to the executable as `server/node.exe` +
-/// `server/app/{dist,node_modules}`.
-fn service_dir(app: &AppHandle) -> Option<PathBuf> {
-    let root = app.path().resource_dir().ok()?;
-    for candidate in [root.join("server"), root.join("resources").join("server")] {
-        if candidate.join("node.exe").exists() {
-            return Some(candidate);
+/// The service runs inside this process: one binary, no bundled runtime.
+fn configure_update_env() {
+    std::env::set_var("ORIEL_UPDATE_REPO", "Soulmte/Oriel");
+    std::env::set_var(
+        "ORIEL_UPDATE_GITEE",
+        option_env!("ORIEL_UPDATE_GITEE_REPO").unwrap_or("Soulmte/Oriel"),
+    );
+    if let Some(cdn) = option_env!("ORIEL_UPDATE_CDN") {
+        if !cdn.trim().is_empty() {
+            std::env::set_var("ORIEL_UPDATE_CDN", cdn.trim());
         }
     }
-    None
+}
+
+/// Starts the embedded service unless something already listens on the port
+/// (a standalone dev service, or a second window that booted first).
+pub fn ensure_service(app: &AppHandle) {
+    let port = api_port();
+    log(&format!("ensure_service port {port}"));
+    if api_ready(port) {
+        log("port already served");
+        return;
+    }
+
+    configure_update_env();
+    let state = oriel_service::AppState::new(port, app.package_info().version.to_string());
+    tauri::async_runtime::spawn(async move {
+        let address = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+        if let Err(error) = oriel_service::serve(state, address).await {
+            log(&format!("service stopped: {error}"));
+        }
+    });
+
+    // Wait briefly so the first paint already has a live service.
+    let deadline = Instant::now() + Duration::from_secs(8);
+    while Instant::now() < deadline {
+        if api_ready(port) {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(80));
+    }
 }
 
 fn prefs_path(app: &AppHandle) -> Option<PathBuf> {
@@ -183,117 +210,7 @@ fn log(message: &str) {
     }
 }
 
-fn spawn_service(app: &AppHandle) -> Option<Child> {
-    let root = match app.path().resource_dir() {
-        Ok(dir) => dir,
-        Err(error) => {
-            log(&format!("resource_dir failed: {error}"));
-            return None;
-        }
-    };
-    log(&format!("resource_dir = {}", root.display()));
-    let dir = service_dir(app)?;
-    log(&format!("service dir = {}", dir.display()));
-    let dir = plain(dir);
-    let entry = dir.join("app").join("dist").join("index.js");
-    if !entry.exists() {
-        log(&format!("entry missing: {}", entry.display()));
-        return None;
-    }
 
-    // Keep the service's own log next to the app instead of a console window.
-    let log_file = std::env::var("TEMP")
-        .ok()
-        .map(|temp| std::path::Path::new(&temp).join("oriel-server.log"))
-        .and_then(|path| std::fs::File::create(path).ok());
-
-    let mut command = Command::new(dir.join("node.exe"));
-    let gitee_repo = option_env!("ORIEL_UPDATE_GITEE_REPO").unwrap_or("Soulmte/Oriel");
-    command
-        .arg(&entry)
-        .current_dir(dir.join("app"))
-        // The updater has no build-time env, so the repository is passed here.
-        .env("ORIEL_UPDATE_REPO", "Soulmte/Oriel")
-        .env("ORIEL_UPDATE_GITEE", gitee_repo)
-        .env("ORIEL_HOST", "127.0.0.1")
-        .env("ORIEL_PORT", api_port().to_string())
-        // A live pipe: when Oriel exits (even after a crash) the child sees EOF
-        // and shuts itself down instead of leaking a server on port 8787.
-        .stdin(Stdio::piped());
-    // CI bakes the CDN prefix in; local builds simply skip it.
-    if let Some(cdn) = option_env!("ORIEL_UPDATE_CDN") {
-        if !cdn.trim().is_empty() {
-            command.env("ORIEL_UPDATE_CDN", cdn.trim());
-        }
-    }
-    match log_file {
-        Some(file) => {
-            let clone = file.try_clone().ok();
-            command.stdout(file);
-            if let Some(clone) = clone {
-                command.stderr(clone);
-            } else {
-                command.stderr(Stdio::null());
-            }
-        }
-        None => {
-            command.stdout(Stdio::null()).stderr(Stdio::null());
-        }
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
-    match command.spawn() {
-        Ok(child) => {
-            log(&format!("spawned pid {}", child.id()));
-            Some(child)
-        }
-        Err(error) => {
-            log(&format!("spawn failed: {error}"));
-            None
-        }
-    }
-}
-
-/// Starts the bundled service unless something already listens on the port
-/// (the dev server, or a second window that booted first).
-pub fn ensure_service(app: &AppHandle) {
-    let port = api_port();
-    log(&format!("ensure_service port {port}"));
-    if api_ready(port) {
-        log("port already served");
-        return;
-    }
-
-    let child = spawn_service(app);
-    if let Some(state) = app.try_state::<ServiceProcess>() {
-        if let Ok(mut slot) = state.0.lock() {
-            *slot = child;
-        }
-    }
-
-    // Wait briefly so the first paint already has a live service.
-    let deadline = Instant::now() + Duration::from_secs(8);
-    while Instant::now() < deadline {
-        if api_ready(port) {
-            return;
-        }
-        std::thread::sleep(Duration::from_millis(120));
-    }
-}
-
-fn stop_service(app: &AppHandle) {
-    if let Some(state) = app.try_state::<ServiceProcess>() {
-        if let Ok(mut slot) = state.0.lock() {
-            if let Some(mut child) = slot.take() {
-                let _ = child.kill();
-                let _ = child.wait();
-            }
-        }
-    }
-}
 
 /* ------------------------------------------------------------------ tray */
 
@@ -325,7 +242,6 @@ pub fn build_tray(app: &AppHandle) -> tauri::Result<TrayIcon> {
                 }
             }
             "quit" => {
-                stop_service(app);
                 app.exit(0);
             }
             _ => {}
@@ -440,13 +356,11 @@ pub fn set_tray_visible(
     Ok(())
 }
 
-/// Kills the bundled service and starts it again. The settings page calls this
-/// when the port was held by a stale process after an upgrade.
+/// The service lives in this process, so "restart" means: drop cached icons and
+/// bring the listener back if it ever died.
 #[tauri::command]
 pub fn restart_service(app: AppHandle) -> Result<(), String> {
-    stop_service(&app);
-    // Give Windows a moment to release the listening socket.
-    std::thread::sleep(Duration::from_millis(150));
+    oriel_core::icons::clear_cache();
     let handle = app.clone();
     std::thread::spawn(move || ensure_service(&handle));
     Ok(())
@@ -689,8 +603,8 @@ pub fn set_default_file_manager(enabled: bool) -> Result<bool, String> {
 
 /* ----------------------------------------------------------------- setup */
 
-pub fn shutdown(app: &AppHandle) {
-    stop_service(app);
+pub fn shutdown(_app: &AppHandle) {
+    // Nothing to tear down: the service is a task inside this process.
 }
 
 pub fn handle_window_event(window: &tauri::Window, event: &WindowEvent) {

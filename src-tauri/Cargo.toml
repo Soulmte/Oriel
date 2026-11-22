@@ -1,10 +1,45 @@
+[workspace]
+members = ["crates/oriel-core", "crates/oriel-service"]
+
+[workspace.package]
+version = "0.1.3"
+edition = "2021"
+license = "MIT"
+rust-version = "1.82"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_Storage_FileSystem",
+  "Win32_System_Threading",
+  "Win32_System_Com",
+  "Win32_System_DataExchange",
+  "Win32_System_Memory",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_Diagnostics_Debug",
+  "Win32_System_ProcessStatus",
+  "Win32_System_RestartManager",
+  "Win32_System_SystemInformation",
+  "Wdk_System_Threading",
+  "Win32_System_Registry",
+  "Win32_NetworkManagement_IpHelper",
+  "Win32_Networking_WinSock",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_Graphics_Gdi",
+  "Win32_Graphics_Dwm",
+  "Win32_System_LibraryLoader",
+] }
+
 [package]
 name = "oriel"
-version = "0.1.3"
+version.workspace = true
 description = "A Finder-style file manager for Windows"
 authors = ["Oriel"]
-edition = "2021"
-rust-version = "1.77.2"
+edition.workspace = true
+rust-version.workspace = true
 
 [lib]
 name = "oriel_lib"
@@ -20,14 +55,11 @@ custom-protocol = ["tauri/custom-protocol"]
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon"] }
-windows = { version = "0.62", features = [
-  "Win32_Foundation",
-  "Win32_System_Com",
-  "Win32_UI_Shell",
-  "Win32_UI_WindowsAndMessaging",
-] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+windows.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+oriel-core = { path = "crates/oriel-core" }
+oriel-service = { path = "crates/oriel-service" }
 
 [profile.release]
 codegen-units = 1

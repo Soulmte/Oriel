@@ -39,7 +39,6 @@ pub fn run() {
             system::take_startup_paths,
             system::install_update
         ])
-        .manage(system::ServiceProcess(std::sync::Mutex::new(None)))
         .manage(system::TrayHandle(std::sync::Mutex::new(None)))
         .manage(system::CloseBehavior(std::sync::atomic::AtomicBool::new(
             true,

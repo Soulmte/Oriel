@@ -8,9 +8,11 @@ import type {
   FileInfoDto,
   HealthResponse,
   ListResponse,
+  LockListResponse,
   PreviewResponse,
   RecycleListResponse,
   PortListResponse,
+  ProcessListResponse,
   UpdateInfoDto,
   SearchResponse,
   SpecialFolderDto,
@@ -114,6 +116,17 @@ export const api = {
   /** Ends the process that owns a port. */
   killPortProcess: (pid: number) =>
     post<{ ok: true; pid: number }>("/system/ports/kill", { pid }),
+
+  /** Every running process with memory, threads and CPU time. */
+  processes: () => request<ProcessListResponse>("/system/processes"),
+
+  /** Ends a process and its children. */
+  killProcess: (pid: number) =>
+    post<{ ok: true; pid: number }>("/system/processes/kill", { pid }),
+
+  /** Processes holding a handle on a file (Windows Restart Manager). */
+  locks: (path: string) =>
+    request<LockListResponse>(`/system/locks${query({ path })}`),
 
   list: (path: string, showHidden = false) =>
     request<ListResponse>(`/fs/list${query({ path, showHidden })}`),

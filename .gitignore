@@ -21,6 +21,3 @@ coverage
 *.7z
 # local scratch
 /tmp/
-
-# Sidecar staged by scripts/pack-sidecar.mjs (built, not committed)
-src-tauri/resources/server/

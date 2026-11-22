@@ -3,6 +3,7 @@ import type { EntryDto } from "@oriel/shared";
 import { clsx } from "clsx";
 import { useExplorer } from "../store/explorer";
 import { useVirtualRows } from "../hooks/useVirtualRows";
+import { useMarqueeSelection } from "../hooks/useMarquee";
 import { useDropTarget } from "../hooks/useDropTarget";
 import { displayName, sortEntriesCached, startsWithPath } from "../lib/format";
 import { GRID_METRICS } from "../lib/appearance";
@@ -58,6 +59,7 @@ function GridTile({
     <button
       type="button"
       data-entry
+      data-entry-path={entry.path}
       data-selected={isSelected}
       data-drop-active={drop.active || undefined}
       draggable
@@ -126,6 +128,7 @@ export function FileGrid({ entries }: { entries: EntryDto[] }) {
   const sortDir = useExplorer((state) => state.sortDir);
   const selected = useExplorer((state) => state.selected);
   const selectOnly = useExplorer((state) => state.selectOnly);
+  const selectPaths = useExplorer((state) => state.selectPaths);
   const clearSelection = useExplorer((state) => state.clearSelection);
   const setContextMenu = useExplorer((state) => state.setContextMenu);
   const dropPaths = useExplorer((state) => state.dropPaths);
@@ -148,6 +151,13 @@ export function FileGrid({ entries }: { entries: EntryDto[] }) {
     columns,
   });
   const { ref, onScroll, first, last, rows } = virtual;
+
+  const getSelection = useCallback(() => useExplorer.getState().selected, []);
+  const marquee = useMarqueeSelection({
+    containerRef: ref,
+    getSelection,
+    onSelect: selectPaths,
+  });
 
   // Column count follows the container width; ResizeObserver keeps it correct
   // when the preview panel is toggled or resized.
@@ -225,7 +235,7 @@ export function FileGrid({ entries }: { entries: EntryDto[] }) {
     <div
       ref={ref}
       onScroll={handleScroll}
-      className="h-full overflow-y-auto"
+      className="relative h-full overflow-y-auto"
       style={{ padding: `${PADDING_Y}px ${PADDING_X}px` }}
       onClick={(event) => {
         if ((event.target as HTMLElement).closest("[data-entry]")) return;
@@ -267,6 +277,19 @@ export function FileGrid({ entries }: { entries: EntryDto[] }) {
 
         {last < rows && <div style={{ height: (rows - last) * metrics.rowHeight }} />}
       </div>
+
+      {marquee && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute z-20 rounded-[2px] border border-mac-blue/80 bg-mac-blue/15"
+          style={{
+            left: marquee.left,
+            top: marquee.top,
+            width: marquee.width,
+            height: marquee.height,
+          }}
+        />
+      )}
     </div>
   );
 }

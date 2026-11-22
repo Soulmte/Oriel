@@ -69,13 +69,18 @@ export function SettingsBrowsing() {
             selectedKeys={[startLocation]}
             onSelectionChange={(keys) => {
               const next = Array.from(keys)[0];
-              if (next === "last" || next === "home") setStartLocation(next);
+              if (next === "last" || next === "home" || next === "start") {
+                setStartLocation(next);
+              }
             }}
             size="sm"
             className={SEGMENT_TRACK}
           >
             <ToggleButton id="last" className={SEGMENT_CLASS}>
               上次位置
+            </ToggleButton>
+            <ToggleButton id="start" className={SEGMENT_CLASS}>
+              首页
             </ToggleButton>
             <ToggleButton id="home" className={SEGMENT_CLASS}>
               个人文件夹

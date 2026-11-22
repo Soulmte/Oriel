@@ -74,6 +74,8 @@ export type DialogState =
   | { kind: "error"; message: string }
   | { kind: "confirm-remove"; paths: string[]; permanent: boolean }
   | { kind: "confirm-purge"; ids: string[]; all: boolean }
+  | { kind: "properties"; paths: string[] }
+  | { kind: "locks"; path: string }
   | {
       kind: "conflict";
       action: TransferKind;
@@ -96,8 +98,8 @@ export interface ToastMessage {
 }
 
 export type SearchScope = "folder" | "disk" | "all";
-/** How the file area is split: one pane, two columns, or four quadrants. */
-export type PaneLayout = "1" | "2" | "4";
+/** How the file area is split: 1 single, 2/3 columns, 4 quadrants. */
+export type PaneLayout = "1" | "2" | "3" | "4";
 
 export interface ContextMenuState {
   x: number;
@@ -105,8 +107,8 @@ export interface ContextMenuState {
   entry?: EntryDto;
 }
 
-export type Route = "files" | "settings" | "recycle";
-export type StartLocation = "last" | "home";
+export type Route = "files" | "home" | "settings" | "recycle" | "processes" | "ports";
+export type StartLocation = "last" | "home" | "start";
 
 interface ClipboardState {
   mode: "copy" | "cut";
@@ -118,6 +120,7 @@ interface ExplorerState {
   ready: boolean;
   system: SystemInfoDto | null;
   drives: DriveDto[];
+  loadDrives: () => Promise<void>;
   specials: SpecialFolderDto[];
 
   path: string;
@@ -205,6 +208,9 @@ interface ExplorerState {
     loading: boolean;
     skippedDrives: string[];
   };
+  /** Folders opened recently, newest first; shown on the start page. */
+  recentFolders: string[];
+  openHome: () => void;
   openRecycle: () => Promise<void>;
   closeRecycle: () => void;
   loadRecycle: () => Promise<void>;
@@ -283,8 +289,14 @@ interface ExplorerState {
   resetPreferences: () => void;
   openSettings: () => void;
   closeSettings: () => void;
+  openProcesses: () => void;
+  closeProcesses: () => void;
+  openPorts: () => void;
+  closePorts: () => void;
 
   selectOnly: (path: string) => void;
+  /** Replace the selection with an explicit list (marquee drag). */
+  selectPaths: (paths: string[]) => void;
   toggleSelect: (path: string) => void;
   selectRange: (path: string) => void;
   selectAll: () => void;
@@ -384,6 +396,21 @@ function startHealthWatch(
 }
 
 const LAST_PATH_KEY = "oriel:last-path";
+const RECENT_KEY = "oriel:recent-folders";
+
+function readRecentFolders(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((value): value is string => typeof value === "string" && value.length > 0)
+      .slice(0, 12);
+  } catch {
+    return [];
+  }
+}
 
 function readSearchScope(): SearchScope {
   try {
@@ -509,7 +536,7 @@ function readBoolean(key: string, fallback: boolean): boolean {
 }
 
 function readLayout(): PaneLayout {
-  return readString<PaneLayout>(PREF.layout, "1", ["1", "2", "4"]);
+  return readString<PaneLayout>(PREF.layout, "1", ["1", "2", "3", "4"]);
 }
 
 function writePreference(key: string, value: string | boolean): void {
@@ -788,10 +815,11 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
   layoutEpoch: 0,
   pendingScrollTop: null,
   showHidden: readBoolean(PREF.showHidden, false),
-  startLocation: readString(PREF.startLocation, "last", ["last", "home"]),
+  startLocation: readString(PREF.startLocation, "last", ["last", "home", "start"]),
   previewOpen: readBoolean(PREF.preview, true),
 
   recycle: { items: [], total: 0, loading: false, skippedDrives: [] },
+  recentFolders: readRecentFolders(),
 
   query: "",
   searchScope: readSearchScope(),
@@ -872,6 +900,11 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
       if (!get().path) {
         await get().navigate(home, { history: "replace" });
       }
+
+      // Opening a folder from Explorer always wins over the start page.
+      if (!(startup && startup.trim()) && get().startLocation === "start") {
+        set({ route: "home" });
+      }
     } catch (error) {
       initStarted = false;
       set({
@@ -894,6 +927,16 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
       // A slower, older request must not overwrite the folder the user is
       // actually looking at now.
       if (seq !== navSeq) return;
+
+      const recentFolders = [
+        response.path,
+        ...get().recentFolders.filter((item) => item !== response.path),
+      ].slice(0, 12);
+      try {
+        localStorage.setItem(RECENT_KEY, JSON.stringify(recentFolders));
+      } catch {
+        // Private mode: the list simply stays per session.
+      }
 
       set((state) => {
         let history = state.history;
@@ -929,6 +972,7 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
           selected: [],
           anchor: null,
           paneActivePath: response.path,
+          recentFolders,
           history,
           historyIndex,
           view: saved?.view ?? state.view,
@@ -1172,6 +1216,71 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
     if (path) void get().navigate(path, { history: "none" });
   },
 
+  openProcesses() {
+    closeSearchStream();
+    searchSeq += 1;
+    set({
+      route: "processes",
+      contextMenu: null,
+      dialog: null,
+      query: "",
+      results: null,
+      searching: false,
+      searchScanned: 0,
+      searchTimedOut: false,
+    });
+  },
+
+  closeProcesses() {
+    set({ route: "files" });
+    if (get().layout !== "1") return;
+    const { path } = get();
+    if (path) void get().navigate(path, { history: "none" });
+  },
+
+  openPorts() {
+    closeSearchStream();
+    searchSeq += 1;
+    set({
+      route: "ports",
+      contextMenu: null,
+      dialog: null,
+      query: "",
+      results: null,
+      searching: false,
+      searchScanned: 0,
+      searchTimedOut: false,
+    });
+  },
+
+  closePorts() {
+    set({ route: "files" });
+    if (get().layout !== "1") return;
+    const { path } = get();
+    if (path) void get().navigate(path, { history: "none" });
+  },
+
+  openHome() {
+    closeSearchStream();
+    searchSeq += 1;
+    set({
+      route: "home",
+      contextMenu: null,
+      dialog: null,
+      query: "",
+      results: null,
+      searching: false,
+    });
+  },
+
+  async loadDrives() {
+    try {
+      set({ drives: await api.drives() });
+    } catch {
+      // A refresh failure keeps the list we already have.
+    }
+  },
+
   async openRecycle() {
     closeSearchStream();
     searchSeq += 1;
@@ -1256,6 +1365,10 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
 
   selectOnly(path) {
     set({ selected: [path], anchor: path });
+  },
+
+  selectPaths(paths) {
+    set({ selected: paths, anchor: paths[0] ?? null });
   },
 
   toggleSelect(path) {

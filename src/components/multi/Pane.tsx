@@ -26,6 +26,7 @@ import {
   SFArrowUpRightSquare,
   SFChevronLeft,
   SFChevronRight,
+  SFChevronDown,
   SFChevronUp,
   SFFolderFill,
   SFListBullet,
@@ -87,6 +88,10 @@ const SORT_CHOICES: Array<{ value: SortKey; label: string }> = [
   { value: "size", label: "大小" },
   { value: "kind", label: "种类" },
 ];
+
+const SORT_LABEL = Object.fromEntries(
+  SORT_CHOICES.map((choice) => [choice.value, choice.label]),
+) as Record<SortKey, string>;
 
 function PaneButton({
   label,
@@ -297,6 +302,7 @@ export function Pane({
     y: number;
     entry?: EntryDto;
   } | null>(null);
+  const [sortMenu, setSortMenu] = useState<{ x: number; y: number } | null>(null);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const pathRef = useRef(initialPath);
@@ -1013,19 +1019,19 @@ export function Pane({
             <SFSquareGrid2x2 size={13} />
           )}
         </PaneButton>
-        <select
-          value={sortKey}
-          onChange={(event) => updateSort(event.target.value as SortKey)}
+        <button
+          type="button"
           aria-label="排序方式"
           title="排序方式"
-          className="h-5 rounded-[4px] bg-transparent text-[10.5px] text-mac-muted outline-none"
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            setSortMenu({ x: Math.round(rect.right - 132), y: Math.round(rect.bottom + 4) });
+          }}
+          className="flex h-5 shrink-0 items-center gap-0.5 rounded-[4px] px-1 text-[10.5px] text-mac-muted transition-colors hover:bg-black/[0.07] hover:text-mac-text dark:hover:bg-white/10"
         >
-          {SORT_CHOICES.map((choice) => (
-            <option key={choice.value} value={choice.value}>
-              {choice.label}
-            </option>
-          ))}
-        </select>
+          {SORT_LABEL[sortKey]}
+          <SFChevronDown size={8} className="opacity-60" />
+        </button>
         <PaneButton
           label={sortDir === "asc" ? "改为降序" : "改为升序"}
           onClick={toggleDirection}
@@ -1182,6 +1188,25 @@ export function Pane({
           minWidth={196}
           zIndex={80}
           onClose={() => setMenu(null)}
+        />
+      )}
+
+      {sortMenu && (
+        <PopupMenu
+          x={sortMenu.x}
+          y={sortMenu.y}
+          items={SORT_CHOICES.map((choice) => ({
+            id: choice.value,
+            label: choice.label,
+            checked: sortKey === choice.value,
+            onSelect: () => {
+              updateSort(choice.value);
+              setSortMenu(null);
+            },
+          }))}
+          minWidth={132}
+          zIndex={85}
+          onClose={() => setSortMenu(null)}
         />
       )}
     </div>

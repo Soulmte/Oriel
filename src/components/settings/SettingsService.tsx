@@ -79,7 +79,7 @@ export function SettingsService() {
         </SettingsRow>
         <SettingsRow title="运行时">
           <span className="text-[12px] text-mac-muted">
-            {system ? `Node ${system.nodeVersion}` : "—"}
+            {system ? "Rust 原生服务" : "—"}
           </span>
         </SettingsRow>
         <SettingsRow title="磁盘">

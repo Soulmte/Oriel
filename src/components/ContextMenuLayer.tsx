@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ClipboardPaste, Copy, Eye, FolderOpen, FolderPlus, Info, Link2, MonitorUp, MoreHorizontal, PackageOpen, Pencil, RefreshCw, Scissors, Settings2, Trash2, Undo2 } from "lucide-react";
+import { ClipboardPaste, Copy, Eye, FolderOpen, FolderPlus, Info, Link2, LockKeyhole, MonitorUp, MoreHorizontal, PackageOpen, Pencil, RefreshCw, Scissors, Settings2, Trash2, Undo2 } from "lucide-react";
 import { useExplorer } from "../store/explorer";
 import {
   isNativeShellAvailable,
@@ -53,9 +53,8 @@ export function ContextMenuLayer() {
         .catch(() => notify("复制路径失败"));
     };
 
-    const showInfo = (target: string) => {
-      selectOnly(target);
-      setPreviewOpen(true);
+    const showInfo = (targets: string[]) => {
+      openDialog({ kind: "properties", paths: targets });
     };
 
     const entry = menu.entry;
@@ -117,6 +116,14 @@ export function ContextMenuLayer() {
           disabled: !path,
           onSelect: () => void reveal(path),
         },
+        {
+          id: "canvas-info",
+          label: "显示简介",
+          icon: <Info className="size-3.5" />,
+          shortcut: "Ctrl+I",
+          disabled: !path,
+          onSelect: () => showInfo([path]),
+        },
       ];
     }
 
@@ -146,6 +153,13 @@ export function ContextMenuLayer() {
           label: "复制路径",
           icon: <Link2 className="size-3.5" />,
           onSelect: () => copyPath(targets),
+        },
+        {
+          id: "show-info",
+          label: `显示简介（${targets.length} 项）`,
+          icon: <Info className="size-3.5" />,
+          shortcut: "Ctrl+I",
+          onSelect: () => showInfo(targets),
         },
         ...(targets.some((path) => !isArchivePath(path))
           ? [
@@ -220,13 +234,24 @@ export function ContextMenuLayer() {
         id: "show-info",
         label: "显示简介",
         icon: <Info className="size-3.5" />,
-        onSelect: () => showInfo(entry.path),
+        shortcut: "Ctrl+I",
+        onSelect: () => showInfo(targets),
       },
+      ...(isFolder || insideArchive
+        ? []
+        : [
+            {
+              id: "file-locks",
+              label: "查看占用进程",
+              icon: <LockKeyhole className="size-3.5" />,
+              onSelect: () => openDialog({ kind: "locks", path: entry.path }),
+            } as MenuItem,
+          ]),
       ...(isNativeShellAvailable()
         ? [
             {
               id: "properties",
-              label: "属性…",
+              label: "Windows 属性…",
               icon: <Settings2 className="size-3.5" />,
               onSelect: () => {
                 void showSystemProperties(entry.path).catch((error: unknown) => {

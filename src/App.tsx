@@ -16,9 +16,13 @@ import { Dialogs } from "./components/Dialogs";
 import { BatchRenameDialog } from "./components/BatchRenameDialog";
 import { ToastHost } from "./components/ToastHost";
 import { SettingsPage } from "./components/SettingsPage";
+import { HomePage } from "./components/HomePage";
 import { RecycleBin } from "./components/RecycleBin";
+import { ProcessesPage } from "./components/ProcessesPage";
+import { PortsPage } from "./components/PortsPage";
 import { OperationsPanel } from "./components/OperationsPanel";
 import { MultiPane } from "./components/multi/MultiPane";
+import { SplitToolbar } from "./components/multi/SplitToolbar";
 
 function ExplorerShell() {
   const init = useExplorer((state) => state.init);
@@ -49,12 +53,21 @@ function ExplorerShell() {
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <main className="flex min-w-0 flex-1 flex-col bg-mac-surface">
-          {route === "settings" ? (
+          {route === "home" ? (
+            <HomePage />
+          ) : route === "settings" ? (
             <SettingsPage />
           ) : route === "recycle" ? (
             <RecycleBin />
+          ) : route === "processes" ? (
+            <ProcessesPage />
+          ) : route === "ports" ? (
+            <PortsPage />
           ) : layout !== "1" ? (
-            <MultiPane />
+            <>
+              <SplitToolbar />
+              <MultiPane />
+            </>
           ) : (
             <>
               <Toolbar />

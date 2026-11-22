@@ -50,6 +50,27 @@ export function useShortcuts() {
         return;
       }
 
+      // The start page is a launcher, not a listing: none of the file
+      // shortcuts should act on the folder behind it.
+      if (state.route === "home") return;
+
+      // Standalone tool pages only answer to Escape (back to the listing).
+      if (state.route === "processes") {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          state.closeProcesses();
+        }
+        return;
+      }
+
+      if (state.route === "ports") {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          state.closePorts();
+        }
+        return;
+      }
+
       // Split view owns its own selection, navigation and menus. Let the
       // focused pane handle the key; only global actions above still apply.
       if (state.layout !== "1") return;
@@ -59,6 +80,20 @@ export function useShortcuts() {
         const input = document.querySelector<HTMLInputElement>("[data-search-input]");
         input?.focus();
         input?.select();
+        return;
+      }
+
+      if (ctrl && key === "i") {
+        event.preventDefault();
+        const targets =
+          state.selected.length > 0
+            ? state.selected
+            : state.path
+              ? [state.path]
+              : [];
+        if (targets.length > 0) {
+          state.openDialog({ kind: "properties", paths: targets });
+        }
         return;
       }
 

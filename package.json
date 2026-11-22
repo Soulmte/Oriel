@@ -3,25 +3,24 @@
   "version": "0.1.3",
   "private": true,
   "type": "module",
-  "description": "A Finder-style file manager for Windows — Tauri 2 + React 19 + local Fastify service",
+  "description": "A Finder-style file manager for Windows — Tauri 2 + React 19 + native Rust service",
   "workspaces": [
-    "server",
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -k -n server,web -c cyan,green \"npm:dev:server\" \"npm:dev:web\"",
-    "dev:server": "npm run dev -w @oriel/server",
+    "dev": "concurrently -k -n api,web -c cyan,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "cargo run -p oriel-service --manifest-path src-tauri/Cargo.toml",
     "dev:web": "vite",
-    "dev:desktop": "wait-on http://127.0.0.1:8787/api/health tcp:5173 && tauri dev",
-    "dev:all": "concurrently -k -n server,web,app -c cyan,green,magenta \"npm:dev:server\" \"npm:dev:web\" \"npm:dev:desktop\"",
-    "build": "npm run build -w @oriel/server && vite build",
+    "dev:desktop": "wait-on tcp:5173 && tauri dev",
+    "dev:all": "concurrently -k -n api,web,app -c cyan,green,magenta \"npm:dev:api\" \"npm:dev:web\" \"npm:dev:desktop\"",
+    "build": "vite build",
     "build:web": "vite build",
-    "build:desktop": "node scripts/pack-sidecar.mjs && vite build && tauri build",
+    "build:desktop": "tauri build",
     "preview": "vite preview",
-    "typecheck": "npm run typecheck -w @oriel/server && tsc --noEmit",
-    "smoke": "npm run smoke -w @oriel/server",
-    "icon": "tauri icon src-tauri/app-icon.png",
-    "pack:sidecar": "node scripts/pack-sidecar.mjs"
+    "typecheck": "tsc --noEmit",
+    "test": "cargo test -p oriel-core --manifest-path src-tauri/Cargo.toml",
+    "smoke": "cargo test -p oriel-core --manifest-path src-tauri/Cargo.toml",
+    "icon": "tauri icon src-tauri/app-icon.png"
   },
   "dependencies": {
     "@heroui/react": "^3.2.7",
