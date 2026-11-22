@@ -31,11 +31,16 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
+Release 正文来自 `docs/release-notes/<tag>.md`（例如 `docs/release-notes/v0.1.4.md`）。
+文件不存在时才回退到 GitHub 自动生成的提交列表。发版前先写好这份说明，Gitee 镜像会
+同步同一份正文。
+
 同时会做两件国内可达性的事：
 
 - **Gitee 镜像**（需要 `GITEE_TOKEN`）：推送代码与 tag，并把同一批安装包挂到 Gitee
-  Release 上。仓库不存在时会用 token 自动创建一个公开仓库；如果 Gitee 账号与 GitHub
-  不同名，再配一个 `GITEE_OWNER`，构建时会把镜像源写成 `<GITEE_OWNER>/Oriel`。
+  Release 上。目标仓库默认 `rain-drops/oriel`（Gitee 上已有的公开仓库，注意是小写
+  `oriel`）；仓库不存在时会用 token 自动创建一个公开仓库。需要换账号或仓库名时，配
+  `GITEE_OWNER` / `GITEE_REPO` secret 覆盖即可。
 - **CDN**（可选）：配置 `CDN_ENDPOINT`、`CDN_BUCKET`、`CDN_ACCESS_KEY_ID`、
   `CDN_SECRET_ACCESS_KEY`、`CDN_PUBLIC_BASE`，构建时会把 `CDN_PUBLIC_BASE` 写进桌面端，
   发布 job 把安装包传到 `<CDN_PUBLIC_BASE>/<tag>/<文件名>`。
@@ -44,12 +49,22 @@ git push origin v0.2.0
 
 ## 4. 应用内更新
 
-桌面端读取：
+桌面端更新源在**构建时**写入 exe（运行时同名环境变量可覆盖）：
 
 - `ORIEL_UPDATE_REPO=owner/repo` —— GitHub 更新源；
-- `ORIEL_UPDATE_GITEE=owner/repo` —— Gitee 镜像源，默认与 GitHub 相同；
+- `ORIEL_UPDATE_GITEE_REPO=owner/repo` —— Gitee 镜像源（兼容旧名
+  `ORIEL_UPDATE_GITEE`），默认 `rain-drops/oriel`；
 - `ORIEL_UPDATE_CDN=https://dl.example.com/oriel` —— 可选；设置后第一下载地址变成
-  `<CDN>/<tag>/<文件名>`，失败后依次尝试 Gitee 和 GitHub。
+  `<CDN>/<tag>/<文件名>`。
+
+`release.yml` 已经把这些值传给 `tauri build`，所以配置好 secrets 后发布产物自带镜像，
+用户机器不需要设置任何环境变量。早前的实现只读运行时环境变量，导致 CI 里的配置没有写进
+安装包，已改为“编译期写入 + 运行时覆盖”。
+
+下载顺序固定为 **CDN → Gitee → GitHub**；每个镜像下载完都会校验文件大小，不完整会自
+动换下一个。启动约 4 秒后自动检查一次，有新版本时右下角弹出卡片，可立即更新、稍后或
+跳过该版本（跳过记录在 localStorage，出现更新版本时会重新提示）。设置 → 关于 里保留
+完整更新日志和手动检查。
 
 CDN 目录结构（发布 job 已按此布局上传）：
 
@@ -64,7 +79,7 @@ CDN 目录结构（发布 job 已按此布局上传）：
 ## 5. Gitee 镜像
 
 ```bash
-git remote add gitee https://gitee.com/<owner>/Oriel.git
+git remote add gitee https://gitee.com/rain-drops/oriel.git
 git push gitee main --tags
 ```
 

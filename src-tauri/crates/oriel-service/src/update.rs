@@ -3,29 +3,65 @@
 //! Assets are merged by name so the UI can try the mirror first and fall back
 //! to GitHub without a second round trip.
 
-use std::time::Duration;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
 use oriel_core::CoreError;
 
-fn repo(kind: &str) -> String {
-    let key = match kind {
-        "gitee" => "ORIEL_UPDATE_GITEE",
-        _ => "ORIEL_UPDATE_REPO",
-    };
-    std::env::var(key)
-        .unwrap_or_else(|_| "Soulmte/Oriel".to_string())
-        .trim()
-        .to_string()
+/// Runtime values win; otherwise use the value baked in by the release build.
+/// The workflow sets these during `tauri build`, so shipped installers carry
+/// the CDN/Gitee mirror without relying on the user's environment.
+fn runtime_or_baked(runtime_key: &str, baked: Option<&str>, fallback: &str) -> String {
+    std::env::var(runtime_key)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .or_else(|| {
+            baked
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| fallback.to_string())
+}
+
+fn github_repo() -> String {
+    runtime_or_baked(
+        "ORIEL_UPDATE_REPO",
+        option_env!("ORIEL_UPDATE_REPO"),
+        "Soulmte/Oriel",
+    )
+}
+
+fn gitee_repo() -> String {
+    let runtime = std::env::var("ORIEL_UPDATE_GITEE")
+        .ok()
+        .or_else(|| std::env::var("ORIEL_UPDATE_GITEE_REPO").ok())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    if let Some(value) = runtime {
+        return value;
+    }
+
+    option_env!("ORIEL_UPDATE_GITEE_REPO")
+        .or(option_env!("ORIEL_UPDATE_GITEE"))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| "rain-drops/oriel".to_string())
 }
 
 fn cdn() -> String {
-    std::env::var("ORIEL_UPDATE_CDN")
-        .unwrap_or_default()
-        .trim()
-        .trim_end_matches('/')
-        .to_string()
+    runtime_or_baked(
+        "ORIEL_UPDATE_CDN",
+        option_env!("ORIEL_UPDATE_CDN"),
+        "",
+    )
+    .trim_end_matches('/')
+    .to_string()
 }
 
 fn parse_version(value: &str) -> Vec<u32> {
@@ -135,7 +171,7 @@ fn fetch(url: &str) -> Option<Value> {
     let response = ureq::get(url)
         .set("Accept", "application/vnd.github+json")
         .set("User-Agent", "Oriel")
-        .timeout(Duration::from_secs(12))
+        .timeout(Duration::from_secs(8))
         .call()
         .ok()?;
     response.into_json::<Value>().ok()
@@ -232,9 +268,54 @@ fn gitee_release(repository: &str) -> Option<Release> {
     })
 }
 
+fn cache() -> &'static Mutex<Option<(Instant, String, Value)>> {
+    static CACHE: OnceLock<Mutex<Option<(Instant, String, Value)>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(None))
+}
+
+const CHECK_TTL: Duration = Duration::from_secs(300);
+
 pub fn check(current: &str) -> Value {
-    let repository = repo("github");
-    if repository.is_empty() {
+    check_with(current, false)
+}
+
+pub fn check_with(current: &str, refresh: bool) -> Value {
+    if !refresh {
+        if let Ok(cache) = cache().lock() {
+            if let Some((at, cached_for, value)) = cache.as_ref() {
+                if cached_for == current && at.elapsed() < CHECK_TTL {
+                    return value.clone();
+                }
+            }
+        }
+    }
+
+    let value = fetch_and_build(current);
+    if let Ok(mut cache) = cache().lock() {
+        *cache = Some((Instant::now(), current.to_string(), value.clone()));
+    }
+    value
+}
+
+fn unavailable(current: &str) -> Value {
+    json!({
+        "configured": true,
+        "current": current,
+        "latest": null,
+        "newer": false,
+        "url": null,
+        "releaseName": null,
+        "notes": null,
+        "compareUrl": null,
+        "publishedAt": null,
+        "assets": [],
+        "error": "无法连接更新服务，请检查网络",
+    })
+}
+
+fn fetch_and_build(current: &str) -> Value {
+    let github_id = github_repo();
+    if github_id.is_empty() {
         return json!({
             "configured": false,
             "current": current,
@@ -248,57 +329,41 @@ pub fn check(current: &str) -> Value {
             "assets": [],
         });
     }
+    let gitee_id = gitee_repo();
 
-    let github = github_release(&repository);
-    let gitee = gitee_release(&repo("gitee"));
-    let mirror_assets = match &gitee {
-        Some(release) => release.assets.clone(),
-        None => Vec::new(),
-    };
+    // GitHub can hang for a long time behind the GFW; querying both in parallel
+    // means a blocked GitHub costs one short timeout instead of two serial ones.
+    let (github, gitee) = std::thread::scope(|scope| {
+        let github = scope.spawn(|| github_release(&github_id));
+        let gitee = scope.spawn(|| gitee_release(&gitee_id));
+        (github.join().ok().flatten(), gitee.join().ok().flatten())
+    });
+    let github_ok = github.is_some();
 
-    let (tag, release_name, notes, published, url, primary) = match (github, gitee) {
-        (Some(github), _gitee) => (
-            github.tag.clone(),
-            github.name.clone(),
-            github.notes.clone(),
-            github.published.clone(),
-            github.html_url.clone(),
-            github.assets,
-        ),
-        (None, Some(gitee)) => (
-            gitee.tag.clone(),
-            gitee.name.clone(),
-            gitee.notes.clone(),
-            gitee.published.clone(),
-            gitee.html_url.clone(),
-            gitee.assets,
-        ),
-        (None, None) => {
-            return json!({
-                "configured": true,
-                "current": current,
-                "latest": null,
-                "newer": false,
-                "url": null,
-                "releaseName": null,
-                "notes": null,
-                "compareUrl": null,
-                "publishedAt": null,
-                "assets": [],
-                "error": "无法连接更新服务，请检查网络",
-            })
+    let primary = match (&github, &gitee) {
+        (Some(github), Some(gitee)) => {
+            if is_newer(&gitee.tag, &github.tag) {
+                gitee
+            } else {
+                github
+            }
         }
+        (Some(github), None) => github,
+        (None, Some(gitee)) => gitee,
+        (None, None) => return unavailable(current),
     };
 
-    let mirror = mirror_assets;
-
-    // Pull the auto-generated compare link out of the notes. When the author
-    // left the body empty, use the commits in that range as the changelog.
-    let (notes, compare_url) = match notes {
+    let (notes, compare_url) = match primary.notes.as_deref() {
         Some(raw) => {
-            let (body, compare) = split_changelog(&raw);
+            let (body, compare) = split_changelog(raw);
             let notes = if body.is_empty() {
-                compare.as_deref().and_then(commit_notes)
+                // The commit fallback is a GitHub API call; skip it when GitHub
+                // was unreachable and the mirror answered instead.
+                if github_ok {
+                    compare.as_deref().and_then(commit_notes)
+                } else {
+                    None
+                }
             } else {
                 Some(body)
             };
@@ -307,22 +372,65 @@ pub fn check(current: &str) -> Value {
         None => (None, None),
     };
 
+    let mut names: Vec<String> = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut github_assets: HashMap<String, (String, u64)> = HashMap::new();
+    let mut gitee_assets: HashMap<String, (String, u64)> = HashMap::new();
+
+    if let Some(release) = &github {
+        for (name, url, size) in &release.assets {
+            github_assets.insert(name.clone(), (url.clone(), *size));
+            if seen.insert(name.clone()) {
+                names.push(name.clone());
+            }
+        }
+    }
+    if let Some(release) = &gitee {
+        for (name, url, size) in &release.assets {
+            gitee_assets.insert(name.clone(), (url.clone(), *size));
+            if seen.insert(name.clone()) {
+                names.push(name.clone());
+            }
+        }
+    }
+
     let prefix = cdn();
+    let tag = primary.tag.clone();
     let mut assets: Vec<Value> = Vec::new();
-    for (name, github_url, size) in primary {
-        let mirror_url = mirror
-            .iter()
-            .find(|(mirror_name, _, _)| mirror_name == &name)
-            .map(|(_, url, _)| url.clone());
-        let preferred = if !prefix.is_empty() {
-            format!("{prefix}/{tag}/{name}")
-        } else {
-            github_url.clone()
-        };
+    for name in names {
+        let github_url = github_assets.get(&name).map(|(url, _)| url.clone());
+        let gitee_url = gitee_assets.get(&name).map(|(url, _)| url.clone());
+        let size = github_assets
+            .get(&name)
+            .map(|(_, size)| *size)
+            .filter(|size| *size > 0)
+            .or_else(|| gitee_assets.get(&name).map(|(_, size)| *size))
+            .unwrap_or(0);
+
+        // Domestic first: CDN → Gitee → GitHub. The UI tries them in order.
+        let mut urls: Vec<String> = Vec::new();
+        if !prefix.is_empty() {
+            urls.push(format!("{prefix}/{tag}/{name}"));
+        }
+        if let Some(url) = &gitee_url {
+            if !urls.contains(url) {
+                urls.push(url.clone());
+            }
+        }
+        if let Some(url) = &github_url {
+            if !urls.contains(url) {
+                urls.push(url.clone());
+            }
+        }
+        if urls.is_empty() {
+            continue;
+        }
+
         assets.push(json!({
             "name": name,
-            "url": preferred,
-            "mirrorUrl": mirror_url,
+            "url": urls[0],
+            "urls": urls,
+            "mirrorUrl": gitee_url,
             "sourceUrl": github_url,
             "size": size,
         }));
@@ -334,11 +442,11 @@ pub fn check(current: &str) -> Value {
         "current": current,
         "latest": latest,
         "newer": is_newer(&tag, current),
-        "url": url,
-        "releaseName": release_name,
+        "url": primary.html_url,
+        "releaseName": primary.name,
         "notes": notes,
         "compareUrl": compare_url,
-        "publishedAt": published,
+        "publishedAt": primary.published,
         "assets": assets,
     })
 }

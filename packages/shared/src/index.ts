@@ -4,7 +4,7 @@
  */
 
 export const APP_NAME = "Oriel";
-export const APP_VERSION = "0.1.3";
+export const APP_VERSION = "0.1.4";
 export const DEFAULT_API_PORT = 8787;
 export const DEFAULT_API_BASE_URL = `http://127.0.0.1:${DEFAULT_API_PORT}`;
 
@@ -181,8 +181,10 @@ export interface RecycleListResponse {
 /** Result of the in-app update check against GitHub releases. */
 export interface UpdateAssetDto {
   name: string;
-  /** Preferred download URL (CDN, then GitHub, then Gitee). */
+  /** Preferred download URL (CDN, then Gitee, then GitHub). */
   url: string;
+  /** All mirrors in the order they should be tried. */
+  urls?: string[];
   /** Gitee mirror for the same file, when the release is mirrored. */
   mirrorUrl?: string | null;
   /** Original GitHub asset, used as the last fallback. */
@@ -289,6 +291,171 @@ export interface LockEntryDto {
 export interface LockListResponse {
   path: string;
   items: LockEntryDto[];
+}
+
+/** One cleanup category, with the paths it may remove. */
+export interface CleanupCategoryDto {
+  id: string;
+  title: string;
+  detail: string;
+  /** `safe` for regenerated caches, `caution` when deleting loses something. */
+  risk: "safe" | "caution";
+  needsAdmin: boolean;
+  available: boolean;
+  size: number;
+  files: number;
+  /** True when the size walk hit its time budget. */
+  partial: boolean;
+  paths: string[];
+}
+
+export interface CleanupFolderDto {
+  name: string;
+  path: string;
+  size: number;
+  files: number;
+  partial: boolean;
+}
+
+export interface CleanupLargeFileDto {
+  name: string;
+  path: string;
+  size: number;
+  /** pagefile.sys and friends: shown for context, never suggested for deletion. */
+  system: boolean;
+}
+
+export interface CleanupReportDto {
+  drive: string;
+  total: number;
+  free: number;
+  used: number;
+  /** Whether the app runs elevated; system-level categories may fail without it. */
+  elevated: boolean;
+  categories: CleanupCategoryDto[];
+  folders: CleanupFolderDto[];
+  largeFiles: CleanupLargeFileDto[];
+  /** True when part of the drive could not be measured in time. */
+  partial: boolean;
+  scannedAt: number;
+}
+
+/** Header of a heatmap stream: the folder being viewed and its volume. */
+export interface CleanupMetaDto {
+  path: string;
+  parent: string | null;
+  drive: string;
+  total: number;
+  free: number;
+  used: number;
+  elevated: boolean;
+}
+
+/** One rectangle in the heatmap; partial sizes grow while the stream runs. */
+export interface CleanupNodeDto {
+  name: string;
+  path: string;
+  kind: "file" | "directory";
+  size: number;
+  files: number;
+  /** False while the subtree is still being measured. */
+  complete: boolean;
+  /** True when the time budget cut the measurement short. */
+  partial: boolean;
+}
+
+export interface CleanupDoneDto {
+  partial: boolean;
+  scannedAt: number;
+}
+
+export interface CleanupItemResultDto {
+  id: string;
+  title: string;
+  freed: number;
+  deleted: number;
+  failed: number;
+  errors: string[];
+}
+
+export interface CleanupResultDto {
+  freed: number;
+  deleted: number;
+  failed: number;
+  items: CleanupItemResultDto[];
+}
+
+/** One entry from the Windows uninstall registry. */
+export interface InstalledAppDto {
+  id: string;
+  name: string;
+  version: string;
+  publisher: string;
+  installLocation: string;
+  uninstallString: string;
+  quietUninstallString: string;
+  estimatedSize: number;
+  /** Best known installed size: measured when available, otherwise the estimate. */
+  size: number;
+  /** True when the size walk hit its time budget. */
+  sizePartial: boolean;
+  /** True when `size` came from walking the install folder. */
+  sizeMeasured: boolean;
+  iconPath: string;
+  /** Already formatted as `YYYY-MM-DD`. */
+  installDate: string;
+  scope: "machine" | "user";
+}
+
+/** Result of measuring one app's install folder. */
+export interface AppSizeInfoDto {
+  size: number;
+  partial: boolean;
+  measured: boolean;
+}
+
+export interface InstalledAppListDto {
+  items: InstalledAppDto[];
+  elevated: boolean;
+  scannedAt: number;
+}
+
+/** A registry key or folder one uninstall may have left behind. */
+export interface LeftoverItemDto {
+  id: string;
+  kind: "registry" | "directory" | "file";
+  label: string;
+  detail: string;
+  size: number;
+  files: number;
+  needsAdmin: boolean;
+  /** True when the size walk hit its time budget. */
+  partial: boolean;
+  risk: "safe" | "caution";
+}
+
+export interface LeftoverReportDto {
+  app: InstalledAppDto;
+  items: LeftoverItemDto[];
+  total: number;
+  elevated: boolean;
+  scannedAt: number;
+}
+
+export interface LeftoverCleanItemDto {
+  id: string;
+  label: string;
+  ok: boolean;
+  freed: number;
+  deleted: number;
+  error: string | null;
+}
+
+export interface LeftoverCleanResultDto {
+  freed: number;
+  deleted: number;
+  failed: number;
+  items: LeftoverCleanItemDto[];
 }
 
 export const SEARCH_MIN_QUERY_LENGTH = 1;

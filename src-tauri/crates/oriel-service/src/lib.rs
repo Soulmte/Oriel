@@ -77,6 +77,28 @@ pub fn router(state: AppState) -> Router {
         .route("/api/system/processes", get(routes::system::processes))
         .route("/api/system/processes/kill", post(routes::system::kill_process))
         .route("/api/system/locks", get(routes::system::locks))
+        .route("/api/system/cleanup", get(routes::system::cleanup))
+        .route("/api/system/cleanup/clean", post(routes::system::cleanup_run))
+        .route(
+            "/api/system/cleanup/stream",
+            get(routes::system::cleanup_stream),
+        )
+        .route(
+            "/api/system/cleanup/categories",
+            get(routes::system::cleanup_categories),
+        )
+        .route("/api/system/apps", get(routes::system::installed_apps))
+        .route(
+            "/api/system/apps/uninstall",
+            post(routes::system::app_uninstall),
+        )
+        .route("/api/system/apps/status", post(routes::system::app_status))
+        .route("/api/system/apps/sizes", post(routes::system::app_sizes))
+        .route(
+            "/api/system/apps/leftovers",
+            post(routes::system::app_leftovers),
+        )
+        .route("/api/system/apps/clean", post(routes::system::app_clean))
         .route("/api/fs/list", get(routes::fs::list))
         .route("/api/fs/stat", get(routes::fs::stat))
         .route("/api/fs/entries", post(routes::fs::entries))

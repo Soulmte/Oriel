@@ -4,7 +4,7 @@ mod system;
 use std::path::Path;
 use std::sync::atomic::Ordering;
 
-use tauri::{Manager, RunEvent};
+use tauri::{Emitter, Manager, RunEvent};
 
 fn startup_paths() -> Vec<String> {
     std::env::args()
@@ -14,12 +14,48 @@ fn startup_paths() -> Vec<String> {
         .collect()
 }
 
+fn elevate_helper_arg() -> Option<u32> {
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        if arg == "--elevate-helper" {
+            return args.next().and_then(|value| value.parse().ok());
+        }
+    }
+    None
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // The elevation helper is a second launch of this exe: it waits for the old
+    // process to exit and then relaunches Oriel with a UAC prompt. It must not
+    // start Tauri, or the single-instance plugin would forward it and quit.
+    if let Some(pid) = elevate_helper_arg() {
+        system::run_elevate_helper(pid);
+        return;
+    }
+
     let hidden = std::env::args().any(|arg| arg == "--hidden" || arg == "-hidden");
     let paths = startup_paths();
 
     tauri::Builder::default()
+        // Opening Oriel again (desktop shortcut, folder handler) must focus the
+        // running window instead of starting a second tray/service process.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            let target = args
+                .iter()
+                .skip(1)
+                .filter(|arg| !arg.starts_with('-'))
+                .find(|arg| Path::new(arg).is_dir())
+                .cloned();
+            if let Some(target) = target {
+                let _ = app.emit("oriel:open-path", target);
+            }
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .invoke_handler(tauri::generate_handler![
             shell::open_properties,
             shell::shell_delete,
@@ -36,6 +72,7 @@ pub fn run() {
             system::set_default_file_manager,
             system::open_default_apps,
             system::restart_service,
+            system::relaunch_elevated,
             system::take_startup_paths,
             system::install_update
         ])

@@ -36,6 +36,12 @@ pub struct DownloadBody {
     pub urls: Option<Vec<String>>,
     pub name: Option<String>,
     pub url: Option<String>,
+    pub size: Option<u64>,
+}
+
+#[derive(Deserialize, Default)]
+pub struct UpdateQuery {
+    pub refresh: Option<String>,
 }
 
 fn ids_of(body: IdsBody) -> Result<Vec<String>, CoreError> {
@@ -120,9 +126,11 @@ pub async fn create_archive(Json(body): Json<CreateArchiveBody>) -> ApiResult<Js
 
 pub async fn update_check(
     axum::extract::State(state): axum::extract::State<Arc<AppState>>,
+    Query(query): Query<UpdateQuery>,
 ) -> ApiResult<Json<Value>> {
     let current = state.app_version.clone();
-    let value = tokio::task::spawn_blocking(move || update::check(&current))
+    let refresh = query.refresh.as_deref() == Some("1");
+    let value = tokio::task::spawn_blocking(move || update::check_with(&current, refresh))
         .await
         .map_err(|error| CoreError::internal(error.to_string()))?;
     Ok(Json(value))
@@ -137,7 +145,8 @@ pub async fn update_download(Json(body): Json<DownloadBody>) -> ApiResult<Json<V
         return Err(CoreError::bad_request("INVALID_BODY", "缺少下载地址").into());
     }
     let name = body.name.unwrap_or_else(|| "oriel-update.bin".to_string());
-    let task = tokio::task::spawn_blocking(move || crate::tasks::create_download(urls, name))
+    let size = body.size.unwrap_or(0);
+    let task = tokio::task::spawn_blocking(move || crate::tasks::create_download(urls, name, size))
         .await
         .map_err(|error| CoreError::internal(error.to_string()))?;
     Ok(Json(json!(task)))

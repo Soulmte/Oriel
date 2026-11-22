@@ -444,7 +444,7 @@ pub fn find_conflicts(sources: &[String], target: &str) -> Vec<(String, String)>
 
 /// Downloads an update asset into the temp folder as a tracked task, trying the
 /// CDN, the Gitee mirror and GitHub in the order the caller supplied.
-pub fn create_download(urls: Vec<String>, name: String) -> Task {
+pub fn create_download(urls: Vec<String>, name: String, expected_size: u64) -> Task {
     let id = new_id();
     let destination = std::env::temp_dir().join(sanitize(&name));
 
@@ -479,18 +479,30 @@ pub fn create_download(urls: Vec<String>, name: String) -> Task {
         state.set(|task| task.status = "running");
         let mut last_error = String::new();
 
+        // Connect quickly, but allow a slow mirror to keep sending data. The
+        // overall request timeout is deliberately absent: a fixed deadline used
+        // to abort large installers on slow connections.
+        let agent = ureq::AgentBuilder::new()
+            .timeout_connect(Duration::from_secs(8))
+            .timeout_read(Duration::from_secs(45))
+            .build();
+
         for url in &urls {
             if state.check().is_err() {
                 state.set(|task| task.status = "cancelled");
                 return;
             }
-            match ureq::get(url).timeout(Duration::from_secs(60)).call() {
+            match agent.get(url).call() {
                 Ok(response) => {
                     let total = response
                         .header("Content-Length")
                         .and_then(|value| value.parse::<u64>().ok())
                         .unwrap_or(0);
-                    state.set(|task| task.bytes_total = total);
+                    // A new mirror starts from zero, so reset the progress.
+                    state.set(|task| {
+                        task.bytes_total = total;
+                        task.bytes_done = 0;
+                    });
 
                     let mut file = match std::fs::File::create(&target_path) {
                         Ok(file) => file,
@@ -518,6 +530,20 @@ pub fn create_download(urls: Vec<String>, name: String) -> Task {
                             }
                         };
                         if read == 0 {
+                            let written = std::fs::metadata(&target_path)
+                                .map(|meta| meta.len())
+                                .unwrap_or(0);
+                            // Proxies often answer a blocked download with an
+                            // HTML error page; the size check rejects it and the
+                            // next mirror gets a chance.
+                            if expected_size > 0 && written != expected_size {
+                                last_error = format!(
+                                    "下载的文件不完整（{written} / {expected_size} 字节）"
+                                );
+                                let _ = std::fs::remove_file(&target_path);
+                                break;
+                            }
+
                             let destination = target_path.to_string_lossy().to_string();
                             state.set(|task| {
                                 task.status = "done";
@@ -538,6 +564,7 @@ pub fn create_download(urls: Vec<String>, name: String) -> Task {
             }
         }
 
+        let _ = std::fs::remove_file(&target_path);
         state.set(|task| {
             task.status = "failed";
             task.current = None;

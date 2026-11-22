@@ -9,7 +9,7 @@
 ## 下载
 
 - [GitHub Releases](https://github.com/Soulmte/Oriel/releases/latest)
-- [国内镜像（Gitee）](https://gitee.com/Soulmte/Oriel/releases)
+- [国内镜像（Gitee）](https://gitee.com/rain-drops/oriel/releases)
 
 支持 Windows 10 / 11（64 位）。安装包自带运行环境，不需要另外安装任何东西；安装过程也不需要管理员权限。
 

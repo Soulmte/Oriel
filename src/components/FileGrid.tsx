@@ -5,6 +5,7 @@ import { useExplorer } from "../store/explorer";
 import { useVirtualRows } from "../hooks/useVirtualRows";
 import { useMarqueeSelection } from "../hooks/useMarquee";
 import { useDropTarget } from "../hooks/useDropTarget";
+import { useDoubleClickOpen } from "../hooks/useDoubleClickOpen";
 import { displayName, sortEntriesCached, startsWithPath } from "../lib/format";
 import { GRID_METRICS } from "../lib/appearance";
 import type { GridSize } from "../lib/appearance";
@@ -43,6 +44,7 @@ function GridTile({
   const navigate = useExplorer((state) => state.navigate);
   const dropPaths = useExplorer((state) => state.dropPaths);
   const platform = useExplorer((state) => state.system?.platform ?? "win32");
+  const openOnClick = useDoubleClickOpen(() => void openEntry(entry));
 
   const drop = useDropTarget({
     enabled: entry.kind === "directory",
@@ -68,8 +70,8 @@ function GridTile({
         if (event.shiftKey) selectRange(entry.path);
         else if (event.ctrlKey || event.metaKey) toggleSelect(entry.path);
         else selectOnly(entry.path);
+        openOnClick(entry.path, event);
       }}
-      onDoubleClick={() => void openEntry(entry)}
       onDragStart={(event) => {
         const state = useExplorer.getState();
         const paths =
@@ -90,7 +92,7 @@ function GridTile({
         });
       }}
       {...drop.dropProps}
-      className="group flex flex-col items-center gap-1.5 rounded-lg py-1 text-center outline-none focus-visible:ring-2 focus-visible:ring-mac-blue/60"
+      className="group flex touch-manipulation flex-col items-center gap-1.5 rounded-lg py-1 text-center outline-none focus-visible:ring-2 focus-visible:ring-mac-blue/60"
     >
       <span
         style={{ width: metrics.labelWidth }}
@@ -244,7 +246,7 @@ export function FileGrid({ entries }: { entries: EntryDto[] }) {
       onContextMenu={(event) => {
         event.preventDefault();
         if ((event.target as HTMLElement).closest("[data-entry]")) return;
-        clearSelection();
+        // Keep the selection; the blank-area menu acts on the current one.
         setContextMenu({ x: event.clientX, y: event.clientY });
       }}
       {...canvas.dropProps}

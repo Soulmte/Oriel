@@ -107,7 +107,7 @@ export interface ContextMenuState {
   entry?: EntryDto;
 }
 
-export type Route = "files" | "home" | "settings" | "recycle" | "processes" | "ports";
+export type Route = "files" | "home" | "settings" | "recycle" | "processes" | "ports" | "cleanup" | "uninstaller";
 export type StartLocation = "last" | "home" | "start";
 
 interface ClipboardState {
@@ -165,7 +165,12 @@ interface ExplorerState {
   /** Compress the current selection into a zip next to it. */
   compressSelection: () => Promise<void>;
   /** Download a release asset and track it in the operations center. */
-  downloadUpdate: (urls: string[], name: string) => Promise<string | null>;
+  downloadUpdate: (
+    urls: string[],
+    name: string,
+    size?: number,
+    quiet?: boolean,
+  ) => Promise<string | null>;
   showHidden: boolean;
   startLocation: StartLocation;
   /** Finder-style preview panel on the right edge. */
@@ -293,6 +298,10 @@ interface ExplorerState {
   closeProcesses: () => void;
   openPorts: () => void;
   closePorts: () => void;
+  openCleanup: () => void;
+  closeCleanup: () => void;
+  openUninstaller: () => void;
+  closeUninstaller: () => void;
 
   selectOnly: (path: string) => void;
   /** Replace the selection with an explicit list (marquee drag). */
@@ -1260,6 +1269,50 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
     if (path) void get().navigate(path, { history: "none" });
   },
 
+  openCleanup() {
+    closeSearchStream();
+    searchSeq += 1;
+    set({
+      route: "cleanup",
+      contextMenu: null,
+      dialog: null,
+      query: "",
+      results: null,
+      searching: false,
+      searchScanned: 0,
+      searchTimedOut: false,
+    });
+  },
+
+  closeCleanup() {
+    set({ route: "files" });
+    if (get().layout !== "1") return;
+    const { path } = get();
+    if (path) void get().navigate(path, { history: "none" });
+  },
+
+  openUninstaller() {
+    closeSearchStream();
+    searchSeq += 1;
+    set({
+      route: "uninstaller",
+      contextMenu: null,
+      dialog: null,
+      query: "",
+      results: null,
+      searching: false,
+      searchScanned: 0,
+      searchTimedOut: false,
+    });
+  },
+
+  closeUninstaller() {
+    set({ route: "files" });
+    if (get().layout !== "1") return;
+    const { path } = get();
+    if (path) void get().navigate(path, { history: "none" });
+  },
+
   openHome() {
     closeSearchStream();
     searchSeq += 1;
@@ -1450,13 +1503,13 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
     }
   },
 
-  async downloadUpdate(urls, name) {
+  async downloadUpdate(urls, name, size = 0, quiet = false) {
     try {
-      const task = await api.downloadUpdate(urls, name);
+      const task = await api.downloadUpdate(urls, name, size);
       set({
         tasks: { ...get().tasks, [task.id]: task },
         activeTaskId: task.id,
-        operationsOpen: true,
+        ...(quiet ? {} : { operationsOpen: true }),
       });
       watchTask(task.id, get);
       return task.id;

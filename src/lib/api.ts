@@ -2,11 +2,17 @@ import type {
   ApiErrorBody,
   ConflictDto,
   ConflictPolicy,
+  CleanupReportDto,
+  CleanupResultDto,
   DirectorySizeDto,
   DriveDto,
   EntryDto,
   FileInfoDto,
   HealthResponse,
+  InstalledAppListDto,
+  AppSizeInfoDto,
+  LeftoverCleanResultDto,
+  LeftoverReportDto,
   ListResponse,
   LockListResponse,
   PreviewResponse,
@@ -127,6 +133,48 @@ export const api = {
   /** Processes holding a handle on a file (Windows Restart Manager). */
   locks: (path: string) =>
     request<LockListResponse>(`/system/locks${query({ path })}`),
+
+  /** Detailed cleanup analysis for one drive (categories, folders, big files). */
+  cleanup: (drive = "C") =>
+    request<CleanupReportDto>(`/system/cleanup${query({ drive })}`),
+
+  /** Deletes the selected cleanup categories; only ids are sent. */
+  cleanupRun: (ids: string[]) =>
+    post<CleanupResultDto>("/system/cleanup/clean", { ids }),
+
+  /** Progressive heatmap of one folder (SSE: meta, scan, node, done). */
+  cleanupStreamUrl: (path: string) =>
+    `${BASE_URL}/api/system/cleanup/stream${query({ path, token: API_TOKEN || undefined })}`,
+
+  /** Cleanup categories measured in the background (SSE: category, done). */
+  cleanupCategoriesUrl: () =>
+    `${BASE_URL}/api/system/cleanup/categories${query({ token: API_TOKEN || undefined })}`,
+
+  /** Installed programs from the uninstall registry. */
+  apps: () => request<InstalledAppListDto>("/system/apps"),
+
+  /** Measures the install folders of the given apps (cached on the server). */
+  appSizes: (ids: string[]) =>
+    post<{ sizes: Record<string, AppSizeInfoDto> }>("/system/apps/sizes", { ids }),
+
+  /** Launches the program's own uninstaller (`quiet` uses QuietUninstallString). */
+  uninstallApp: (id: string, quiet = false) =>
+    post<{ ok: true; pid: number | null }>("/system/apps/uninstall", { id, quiet }),
+
+  /** Whether the launched uninstaller is still running (`null`: not queryable). */
+  appUninstallStatus: (pid: number) =>
+    post<{ running: boolean | null }>("/system/apps/status", { pid }),
+
+  /** Scans the registry keys and folders an uninstall may have left behind. */
+  appLeftovers: (id: string) =>
+    post<LeftoverReportDto>("/system/apps/leftovers", { id }),
+
+  /**
+   * Deletes leftover candidates by id. The server rescans first, so a caller
+   * cannot pass an arbitrary key or path.
+   */
+  cleanAppLeftovers: (id: string, registry: string[], paths: string[]) =>
+    post<LeftoverCleanResultDto>("/system/apps/clean", { id, registry, paths }),
 
   list: (path: string, showHidden = false) =>
     request<ListResponse>(`/fs/list${query({ path, showHidden })}`),
@@ -288,10 +336,11 @@ export const api = {
     request<UpdateInfoDto>(`/app/update${refresh ? "?refresh=1" : ""}`),
 
   /** Downloads a release asset into the temp folder as a tracked task. */
-  downloadUpdate: (urls: string | string[], name: string) =>
+  downloadUpdate: (urls: string | string[], name: string, size = 0) =>
     post<TaskProgressDto>("/app/update/download", {
       urls: Array.isArray(urls) ? urls : [urls],
       name,
+      size,
     }),
 
   /** Single-shot progress read; used as a fallback when SSE drops an update. */

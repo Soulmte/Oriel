@@ -16,7 +16,9 @@ import {
   SFMusicNote,
   SFNetwork,
   SFPhotoFill,
+  SFSparkles,
   SFTrashFill,
+  SFXmarkBinFill,
 } from "sf-symbols-lib/dualtone";
 import { Meter } from "@heroui/react";
 import { clsx } from "clsx";
@@ -160,6 +162,8 @@ export function Sidebar() {
   const openHome = useExplorer((state) => state.openHome);
   const openProcesses = useExplorer((state) => state.openProcesses);
   const openPorts = useExplorer((state) => state.openPorts);
+  const openCleanup = useExplorer((state) => state.openCleanup);
+  const openUninstaller = useExplorer((state) => state.openUninstaller);
   const layoutEpoch = useExplorer((state) => state.layoutEpoch);
   const displayPath = layout === "1" ? path : paneActivePath || path;
 
@@ -406,6 +410,22 @@ export function Sidebar() {
             onSelect={openPorts}
             compact={collapsed}
             icon={<SFNetwork size={16} className="shrink-0 text-[#5e5ce6]" />}
+          />
+          <SidebarItem
+            active={route === "cleanup"}
+            label="磁盘清理"
+            title="分析 C 盘占用并清理临时文件、缓存与回收站"
+            onSelect={openCleanup}
+            compact={collapsed}
+            icon={<SFSparkles size={16} className="shrink-0 text-[#30d158]" />}
+          />
+          <SidebarItem
+            active={route === "uninstaller"}
+            label="卸载工具"
+            title="运行卸载程序，并清理注册表与文件残留"
+            onSelect={openUninstaller}
+            compact={collapsed}
+            icon={<SFXmarkBinFill size={16} className="shrink-0 text-[#ff453a]" />}
           />
         </div>
       </div>

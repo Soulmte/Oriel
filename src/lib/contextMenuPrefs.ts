@@ -60,6 +60,8 @@ export const BUILTIN_MENU_ITEMS: Array<{
   { id: "canvas-refresh", label: "刷新", scope: "canvas" },
   { id: "canvas-hidden", label: "显示隐藏文件", scope: "canvas" },
   { id: "canvas-reveal", label: "在资源管理器中打开", scope: "canvas" },
+  { id: "canvas-compress", label: "压缩所选为 ZIP", scope: "canvas" },
+  { id: "canvas-rename-batch", label: "批量重命名…", scope: "canvas" },
 ];
 
 export function readContextMenuPrefs(): ContextMenuPrefs {

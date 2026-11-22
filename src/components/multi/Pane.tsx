@@ -45,6 +45,7 @@ import {
 } from "../../lib/format";
 import { dragKind, getDraggedPaths, setDragPayload } from "../../lib/dnd";
 import { useDropTarget } from "../../hooks/useDropTarget";
+import { useDoubleClickOpen } from "../../hooks/useDoubleClickOpen";
 import { SHELL_ICON_EXTENSIONS, useExplorer } from "../../store/explorer";
 import { paneBridge } from "../../lib/paneBridge";
 import { PopupMenu } from "../PopupMenu";
@@ -159,6 +160,7 @@ function PaneTile({
     onDrop: (paths, event) => onDropInto(entry, paths, dragKind(event)),
     onHover: () => onHoverFolder(entry),
   });
+  const openOnClick = useDoubleClickOpen(() => onOpen(entry));
 
   const label = displayName(entry, showExtensions);
   const icon = (
@@ -180,13 +182,13 @@ function PaneTile({
         onClick={(event) => {
           onActivate();
           onSelect(event, entry);
+          openOnClick(entry.path, event);
         }}
-        onDoubleClick={() => onOpen(entry)}
         onContextMenu={(event) => onMenu(event, entry)}
         onDragStart={(event) => onDragStart(event, entry)}
         title={entry.path}
         className={clsx(
-          "flex h-7 w-full items-center gap-2 rounded-[5px] px-2 text-left text-[12px] outline-none",
+          "flex h-7 w-full touch-manipulation items-center gap-2 rounded-[5px] px-2 text-left text-[12px] outline-none",
           "transition-colors focus-visible:ring-2 focus-visible:ring-mac-blue/50",
           drop.active
             ? "bg-mac-blue/20 ring-1 ring-inset ring-mac-blue"
@@ -218,13 +220,13 @@ function PaneTile({
       onClick={(event) => {
         onActivate();
         onSelect(event, entry);
+        openOnClick(entry.path, event);
       }}
-      onDoubleClick={() => onOpen(entry)}
       onContextMenu={(event) => onMenu(event, entry)}
       onDragStart={(event) => onDragStart(event, entry)}
       title={entry.path}
       className={clsx(
-        "flex h-[88px] flex-col items-center gap-1 rounded-[7px] px-1 py-1.5 text-center outline-none",
+        "flex h-[88px] touch-manipulation flex-col items-center gap-1 rounded-[7px] px-1 py-1.5 text-center outline-none",
         "transition-colors focus-visible:ring-2 focus-visible:ring-mac-blue/50",
         drop.active
           ? "bg-mac-blue/20 ring-1 ring-inset ring-mac-blue"

@@ -14,8 +14,8 @@ jobs:
       # Baked into the Rust shell so the bundled updater prefers the CDN.
       # Leave the secret unset to ship a GitHub/Gitee-only build.
       ORIEL_UPDATE_CDN: ${{ secrets.CDN_PUBLIC_BASE }}
-      # Gitee mirror repo. Defaults to the same owner as the GitHub repo.
-      ORIEL_UPDATE_GITEE_REPO: ${{ secrets.GITEE_OWNER && format('{0}/Oriel', secrets.GITEE_OWNER) || 'Soulmte/Oriel' }}
+      # Gitee mirror repo. This is the China-facing download source.
+      ORIEL_UPDATE_GITEE_REPO: rain-drops/oriel
     steps:
       - uses: actions/checkout@v4
 
@@ -37,6 +37,15 @@ jobs:
       - name: Build desktop installer
         run: npm run build:desktop
 
+      - name: Prepare release notes
+        id: notes
+        shell: bash
+        run: |
+          FILE="docs/release-notes/${GITHUB_REF_NAME}.md"
+          if [ -f "$FILE" ]; then
+            echo "path=$FILE" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Keep the installers for the mirror jobs
         uses: actions/upload-artifact@v4
         with:
@@ -54,7 +63,8 @@ jobs:
           files: |
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
-          generate_release_notes: true
+          body_path: ${{ steps.notes.outputs.path }}
+          generate_release_notes: ${{ steps.notes.outputs.path == '' }}
 
   # The China-facing mirror. Code/tags are pushed to Gitee and the same
   # installers are attached to a Gitee release, so the in-app updater can fall
@@ -92,19 +102,21 @@ jobs:
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
           GITEE_OWNER: ${{ secrets.GITEE_OWNER }}
+          GITEE_REPO: ${{ secrets.GITEE_REPO }}
         run: |
           set -euo pipefail
-          TARGET_OWNER="${GITEE_OWNER:-${OWNER}}"
+          TARGET_OWNER="${GITEE_OWNER:-rain-drops}"
+          TARGET_REPO="${GITEE_REPO:-oriel}"
           API="https://gitee.com/api/v5"
-          if curl -fsSL "${API}/repos/${TARGET_OWNER}/${REPO}?access_token=${GITEE_TOKEN}" > /dev/null; then
+          if curl -fsSL "${API}/repos/${TARGET_OWNER}/${TARGET_REPO}?access_token=${GITEE_TOKEN}" > /dev/null; then
             echo "repository exists"
             exit 0
           fi
           curl -fsSL -X POST "${API}/user/repos" \
             -H "Content-Type: application/x-www-form-urlencoded" \
             --data-urlencode "access_token=${GITEE_TOKEN}" \
-            --data-urlencode "name=${REPO}" \
-            --data-urlencode "path=${REPO}" \
+            --data-urlencode "name=${TARGET_REPO}" \
+            --data-urlencode "path=${TARGET_REPO}" \
             --data-urlencode "private=false" \
             --data-urlencode "auto_init=false" > /dev/null
 
@@ -114,10 +126,12 @@ jobs:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
           OWNER: ${{ github.repository_owner }}
           GITEE_OWNER: ${{ secrets.GITEE_OWNER }}
+          GITEE_REPO: ${{ secrets.GITEE_REPO }}
         run: |
           set -euo pipefail
-          TARGET_OWNER="${GITEE_OWNER:-${OWNER}}"
-          git remote add gitee "https://oauth2:${GITEE_TOKEN}@gitee.com/${TARGET_OWNER}/Oriel.git"
+          TARGET_OWNER="${GITEE_OWNER:-rain-drops}"
+          TARGET_REPO="${GITEE_REPO:-oriel}"
+          git remote add gitee "https://oauth2:${GITEE_TOKEN}@gitee.com/${TARGET_OWNER}/${TARGET_REPO}.git"
           git push gitee "refs/remotes/origin/*:refs/heads/*" --tags --force
 
       - name: Mirror release assets to Gitee
@@ -128,12 +142,14 @@ jobs:
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
           GITEE_OWNER: ${{ secrets.GITEE_OWNER }}
+          GITEE_REPO: ${{ secrets.GITEE_REPO }}
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
 
-          TARGET_OWNER="${GITEE_OWNER:-${OWNER}}"
-          API="https://gitee.com/api/v5/repos/${TARGET_OWNER}/${REPO}"
+          TARGET_OWNER="${GITEE_OWNER:-rain-drops}"
+          TARGET_REPO="${GITEE_REPO:-oriel}"
+          API="https://gitee.com/api/v5/repos/${TARGET_OWNER}/${TARGET_REPO}"
           NOTES=$(curl -fsSL \
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
             -H "Accept: application/vnd.github+json" \

@@ -71,6 +71,22 @@ export function useShortcuts() {
         return;
       }
 
+      if (state.route === "cleanup") {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          state.closeCleanup();
+        }
+        return;
+      }
+
+      if (state.route === "uninstaller") {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          state.closeUninstaller();
+        }
+        return;
+      }
+
       // Split view owns its own selection, navigation and menus. Let the
       // focused pane handle the key; only global actions above still apply.
       if (state.layout !== "1") return;

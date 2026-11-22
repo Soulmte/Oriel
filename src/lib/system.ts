@@ -83,6 +83,15 @@ export async function restartService(): Promise<void> {
   await invoke("restart_service");
 }
 
+/**
+ * Restarts Oriel through a UAC prompt. The current window closes first, then a
+ * helper relaunches the exe elevated so system-level cleanup can proceed.
+ */
+export async function relaunchElevated(): Promise<void> {
+  if (!isNativeShellAvailable()) return;
+  await invoke("relaunch_elevated");
+}
+
 /** Folder paths passed on the command line by the shell integration. */
 export async function takeStartupPaths(): Promise<string[]> {
   if (!isNativeShellAvailable()) return [];

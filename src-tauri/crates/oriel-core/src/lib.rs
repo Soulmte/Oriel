@@ -5,7 +5,9 @@
 //! carries the attributes. The service layer (`oriel-service`) turns these into
 //! HTTP routes, and the Tauri shell only starts that service.
 
+pub mod apps;
 pub mod clipboard;
+pub mod cleanup;
 pub mod drives;
 pub mod entry;
 pub mod error;

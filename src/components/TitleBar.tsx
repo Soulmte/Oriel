@@ -61,6 +61,8 @@ export function TitleBar() {
     if (route === "home") return "首页";
     if (route === "processes") return "进程管理器";
     if (route === "ports") return "端口进程";
+    if (route === "cleanup") return "磁盘清理";
+    if (route === "uninstaller") return "卸载工具";
     if (!displayPath) return "Oriel";
     if (isArchivePath(displayPath)) {
       const { archive, inner } = parseArchivePath(displayPath);

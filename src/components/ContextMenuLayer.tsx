@@ -109,6 +109,19 @@ export function ContextMenuLayer() {
               } as MenuItem,
             ]
           : []),
+        ...(selected.length > 1
+          ? [
+              {
+                id: "canvas-rename-batch",
+                label: `批量重命名 ${selected.length} 项…`,
+                icon: <Pencil className="size-3.5" />,
+                shortcut: "F2",
+                disabled: selected.some((item) => isArchivePath(item)),
+                onSelect: () =>
+                  openDialog({ kind: "batch-rename", paths: [...selected] }),
+              } as MenuItem,
+            ]
+          : []),
         {
           id: "canvas-reveal",
           label: "在资源管理器中打开",

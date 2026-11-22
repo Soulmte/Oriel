@@ -17,7 +17,6 @@ import {
   SFArrowUp,
   SFArrowUpRightSquare,
   SFCheckmark,
-  SFChevronDown,
   SFChevronLeft,
   SFChevronRight,
   SFChevronUp,
@@ -31,6 +30,7 @@ import {
   SFListBullet,
   SFMagnifyingglass,
   SFSliderHorizontal3,
+  SFPencil,
   SFPlus,
   SFSidebarRight,
   SFSquareGrid2x2,
@@ -38,6 +38,7 @@ import {
 } from "sf-symbols-lib/dualtone";
 import { Loader2 } from "lucide-react";
 import { FormatIcon } from "../lib/fileIcons";
+import { isArchivePath } from "../lib/archivePath";
 import type { SortKey, ViewMode } from "@oriel/shared";
 import type { SearchScope, PaneLayout } from "../store/explorer";
 import { useExplorer } from "../store/explorer";
@@ -190,6 +191,7 @@ export function Toolbar() {
   const setShowHidden = useExplorer((state) => state.setShowHidden);
   const previewOpen = useExplorer((state) => state.previewOpen);
   const togglePreview = useExplorer((state) => state.togglePreview);
+  const selected = useExplorer((state) => state.selected);
   const openSettings = useExplorer((state) => state.openSettings);
   const openTerminal = useExplorer((state) => state.openTerminal);
   const notify = useExplorer((state) => state.notify);
@@ -253,6 +255,11 @@ export function Toolbar() {
         case "refresh":
           reload();
           break;
+        case "batch-rename":
+          if (selected.length > 1) {
+            openDialog({ kind: "batch-rename", paths: [...selected] });
+          }
+          break;
         case "settings":
           openSettings();
           break;
@@ -267,6 +274,8 @@ export function Toolbar() {
       reveal,
       setShowHidden,
       showHidden,
+      openDialog,
+      selected,
     ],
   );
 
@@ -398,7 +407,6 @@ export function Toolbar() {
           <span className="whitespace-nowrap">
             {showLabels ? SORT_LABELS[sortKey] : "排序"}
           </span>
-          <SFChevronDown size={9} className="opacity-55" />
         </Button>
         <Dropdown.Popover placement="bottom start" className="min-w-[208px]">
           <Dropdown.Menu onAction={handleSortAction}>
@@ -435,7 +443,6 @@ export function Toolbar() {
           {groupKey !== "none" && (
             <span className="size-1.5 rounded-full bg-mac-blue" aria-hidden="true" />
           )}
-          <SFChevronDown size={9} className="opacity-55" />
         </Button>
         <Dropdown.Popover placement="bottom start" className="min-w-[184px]">
           <Dropdown.Menu onAction={(key) => setGroup(String(key) as GroupKey)}>
@@ -469,7 +476,6 @@ export function Toolbar() {
               <SFExternaldriveFill size={14} />
             )}
             <span className="whitespace-nowrap">{SEARCH_SCOPE_LABELS[searchScope]}</span>
-            <SFChevronDown size={9} className="opacity-55" />
           </Button>
           <Dropdown.Popover placement="bottom end" className="min-w-[184px]">
             <Dropdown.Menu onAction={(key) => setSearchScope(String(key) as SearchScope)}>
@@ -569,6 +575,27 @@ export function Toolbar() {
           <Loader2 className="size-3.5 shrink-0 animate-spin text-mac-muted" />
         )}
 
+        {selected.length > 1 && (
+          <Tooltip delay={500}>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              aria-label={`批量重命名 ${selected.length} 项`}
+              className={TOOL_ICON_CLASS}
+              isDisabled={selected.some((item) => isArchivePath(item))}
+              onPress={() =>
+                openDialog({ kind: "batch-rename", paths: [...selected] })
+              }
+            >
+              <SFPencil size={16} />
+            </Button>
+            <Tooltip.Content>
+              批量重命名 {selected.length} 项 · F2
+            </Tooltip.Content>
+          </Tooltip>
+        )}
+
         <Tooltip delay={500}>
           <Button
             isIconOnly
@@ -598,6 +625,21 @@ export function Toolbar() {
                 <Label>显示隐藏文件</Label>
                 <span className="ml-auto text-[11px] text-muted">Ctrl+H</span>
                 {showHidden && <SFCheckmark size={14} />}
+              </Dropdown.Item>
+              <Dropdown.Item
+                id="batch-rename"
+                textValue="批量重命名"
+                isDisabled={
+                  selected.length < 2 ||
+                  selected.some((item) => isArchivePath(item))
+                }
+              >
+                <SFPencil size={14} className="shrink-0 text-muted" />
+                <Label>
+                  批量重命名
+                  {selected.length > 1 ? `（${selected.length} 项）` : "…"}
+                </Label>
+                <span className="ml-auto text-[11px] text-muted">F2</span>
               </Dropdown.Item>
               <Separator />
               <Dropdown.Item id="reveal" textValue="在资源管理器中打开" isDisabled={!path}>

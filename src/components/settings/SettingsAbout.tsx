@@ -9,6 +9,7 @@ import { api, errorMessage } from "../../lib/api";
 import { installUpdate } from "../../lib/system";
 import { formatBytes } from "../../lib/format";
 import { Markdown } from "../../lib/markdown";
+import { assetUrls, pickPrimaryAsset } from "../../lib/update";
 import { SettingsPageHeader, SettingsRow, SettingsSection } from "./shared";
 
 /**
@@ -59,15 +60,10 @@ export function SettingsAbout() {
         ? 100
         : 0;
 
-  const primaryAsset = useMemo(() => {
-    if (!update?.assets?.length) return null;
-    return (
-      update.assets.find((asset) => /setup.*\.exe$/i.test(asset.name)) ??
-      update.assets.find((asset) => /\.exe$/i.test(asset.name)) ??
-      update.assets.find((asset) => /\.(msi|msix)$/i.test(asset.name)) ??
-      update.assets[0]
-    );
-  }, [update]);
+  const primaryAsset = useMemo(
+    () => pickPrimaryAsset(update?.assets ?? []),
+    [update],
+  );
 
   const check = async (refresh = false) => {
     setChecking(true);
@@ -228,12 +224,11 @@ export function SettingsAbout() {
                       download?.status === "running" || download?.status === "queued"
                     }
                     onPress={async () => {
-                      const urls = [
-                        primaryAsset.url,
-                        primaryAsset.mirrorUrl,
-                        primaryAsset.sourceUrl,
-                      ].filter((value): value is string => Boolean(value));
-                      const id = await downloadUpdate(urls, primaryAsset.name);
+                      const id = await downloadUpdate(
+                        assetUrls(primaryAsset),
+                        primaryAsset.name,
+                        primaryAsset.size,
+                      );
                       if (id) setDownloadId(id);
                     }}
                   >

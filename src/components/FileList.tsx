@@ -8,6 +8,7 @@ import { useInView } from "../hooks/useInView";
 import { useVirtualRows } from "../hooks/useVirtualRows";
 import { useMarqueeSelection } from "../hooks/useMarquee";
 import { useDropTarget } from "../hooks/useDropTarget";
+import { useDoubleClickOpen } from "../hooks/useDoubleClickOpen";
 import {
   displayName,
   fileKindLabel,
@@ -111,6 +112,7 @@ function ListRow({
   const navigate = useExplorer((state) => state.navigate);
   const dropPaths = useExplorer((state) => state.dropPaths);
   const platform = useExplorer((state) => state.system?.platform ?? "win32");
+  const openOnClick = useDoubleClickOpen(() => void openEntry(entry));
 
   const drop = useDropTarget({
     enabled: entry.kind === "directory",
@@ -133,8 +135,8 @@ function ListRow({
         if (event.shiftKey) selectRange(entry.path);
         else if (event.ctrlKey || event.metaKey) toggleSelect(entry.path);
         else selectOnly(entry.path);
+        openOnClick(entry.path, event);
       }}
-      onDoubleClick={() => void openEntry(entry)}
       onDragStart={(event) => {
         const state = useExplorer.getState();
         const paths =
@@ -156,7 +158,7 @@ function ListRow({
       }}
       {...drop.dropProps}
       className={clsx(
-        "grid cursor-default items-center px-4 text-[12.5px]",
+        "grid cursor-default touch-manipulation items-center px-4 text-[12.5px]",
         template,
         drop.active
           ? "bg-mac-blue/25 ring-1 ring-inset ring-mac-blue"
@@ -372,7 +374,8 @@ export function FileList({ entries }: { entries: EntryDto[] }) {
         onContextMenu={(event) => {
           event.preventDefault();
           if ((event.target as HTMLElement).closest("[data-entry]")) return;
-          clearSelection();
+          // Keep the current selection: the blank-area menu offers actions for
+          // "the selection" (compress, batch rename), so clearing here hid them.
           setContextMenu({ x: event.clientX, y: event.clientY });
         }}
         {...canvas.dropProps}

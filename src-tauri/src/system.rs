@@ -7,6 +7,7 @@
 //! toggles as commands, and keeps the shell integration together.
 
 use std::net::TcpStream;
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -358,6 +359,58 @@ pub fn set_tray_visible(
 
 /// The service lives in this process, so "restart" means: drop cached icons and
 /// bring the listener back if it ever died.
+/// Restarts Oriel elevated. A small helper process waits for this instance to
+/// exit, then asks Windows for elevation, so the single-instance guard never
+/// sees two live windows. That is how Geek-like tools end up running as admin:
+/// they ask once at startup instead of per action.
+#[tauri::command]
+pub fn relaunch_elevated(app: AppHandle) -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|error| error.to_string())?;
+    Command::new(&exe)
+        .arg("--elevate-helper")
+        .arg(std::process::id().to_string())
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map_err(|error| format!("无法重启 Oriel：{error}"))?;
+    app.exit(0);
+    Ok(())
+}
+
+/// Entry point for the helper spawned by `relaunch_elevated`.
+pub fn run_elevate_helper(parent_pid: u32) {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while Instant::now() < deadline && oriel_core::apps::process_running(parent_pid) {
+        std::thread::sleep(Duration::from_millis(250));
+    }
+
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    let verb = wide("runas");
+    let file = wide(&exe.to_string_lossy());
+    let mut info = windows::Win32::UI::Shell::SHELLEXECUTEINFOW {
+        cbSize: std::mem::size_of::<windows::Win32::UI::Shell::SHELLEXECUTEINFOW>() as u32,
+        fMask: windows::Win32::UI::Shell::SEE_MASK_NOCLOSEPROCESS,
+        lpVerb: windows::core::PCWSTR(verb.as_ptr()),
+        lpFile: windows::core::PCWSTR(file.as_ptr()),
+        nShow: windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL.0,
+        ..Default::default()
+    };
+    unsafe {
+        let _ = windows::Win32::UI::Shell::ShellExecuteExW(&mut info);
+        if !info.hProcess.is_invalid() {
+            let _ = windows::Win32::Foundation::CloseHandle(info.hProcess);
+        }
+    }
+}
+
+fn wide(value: &str) -> Vec<u16> {
+    value.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
 #[tauri::command]
 pub fn restart_service(app: AppHandle) -> Result<(), String> {
     oriel_core::icons::clear_cache();
