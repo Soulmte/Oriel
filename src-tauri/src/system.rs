@@ -95,20 +95,6 @@ fn api_ready(port: u16) -> bool {
     TcpStream::connect_timeout(&socket, Duration::from_millis(180)).is_ok()
 }
 
-/// The service runs inside this process: one binary, no bundled runtime.
-fn configure_update_env() {
-    std::env::set_var("ORIEL_UPDATE_REPO", "Soulmte/Oriel");
-    std::env::set_var(
-        "ORIEL_UPDATE_GITEE",
-        option_env!("ORIEL_UPDATE_GITEE_REPO").unwrap_or("Soulmte/Oriel"),
-    );
-    if let Some(cdn) = option_env!("ORIEL_UPDATE_CDN") {
-        if !cdn.trim().is_empty() {
-            std::env::set_var("ORIEL_UPDATE_CDN", cdn.trim());
-        }
-    }
-}
-
 /// Starts the embedded service unless something already listens on the port
 /// (a standalone dev service, or a second window that booted first).
 pub fn ensure_service(app: &AppHandle) {
@@ -119,7 +105,8 @@ pub fn ensure_service(app: &AppHandle) {
         return;
     }
 
-    configure_update_env();
+    // The updater reads its mirror settings from `option_env!` in
+    // oriel-service; do not shadow them with runtime overrides here.
     let state = oriel_service::AppState::new(port, app.package_info().version.to_string());
     tauri::async_runtime::spawn(async move {
         let address = std::net::SocketAddr::from(([127, 0, 0, 1], port));

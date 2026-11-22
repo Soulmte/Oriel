@@ -270,9 +270,16 @@ fn gitee_release(repository: &str) -> Option<Release> {
 /// of anonymous calls. The mirror therefore also publishes `update.json` on
 /// `main`: a raw file has no such limit and carries the sizes the API omits.
 fn gitee_manifest(repository: &str) -> Option<Release> {
-    let value = fetch(&format!(
-        "https://gitee.com/{repository}/raw/main/update.json"
-    ))?;
+    let url = format!("https://gitee.com/{repository}/raw/main/update.json");
+    let response = ureq::get(&url)
+        .set("User-Agent", "Oriel")
+        .timeout(Duration::from_secs(8))
+        .call()
+        .ok()?;
+    // The raw endpoint serves the file as `text/plain`, which `into_json`
+    // refuses, so read the body and parse it ourselves.
+    let text = response.into_string().ok()?;
+    let value: Value = serde_json::from_str(&text).ok()?;
     manifest_from_value(repository, &value)
 }
 
