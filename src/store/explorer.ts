@@ -33,6 +33,7 @@ import type { ContextMenuPrefs } from "../lib/contextMenuPrefs";
 import { readCachedIcons, pruneCachedIcons, writeCachedIcons } from "../lib/iconCache";
 import type { CachedShellIcon } from "../lib/iconCache";
 import { restartService, takeStartupPaths } from "../lib/system";
+import { paneBridge } from "../lib/paneBridge";
 import {
   basename,
   parentPath,
@@ -95,6 +96,8 @@ export interface ToastMessage {
 }
 
 export type SearchScope = "folder" | "disk" | "all";
+/** How the file area is split: one pane, two columns, or four quadrants. */
+export type PaneLayout = "1" | "2" | "4";
 
 export interface ContextMenuState {
   x: number;
@@ -128,6 +131,11 @@ interface ExplorerState {
    * A listing error no longer implies a dead service.
    */
   online: boolean | null;
+
+  /** 1 = normal view, 2 = side-by-side, 4 = quadrants. */
+  layout: PaneLayout;
+  /** Folder shown by the pane that currently has keyboard focus. */
+  paneActivePath: string;
 
   history: string[];
   historyIndex: number;
@@ -251,6 +259,11 @@ interface ExplorerState {
     target: string,
     options?: { history?: "push" | "replace" | "none"; index?: number },
   ) => Promise<void>;
+  /** Sidebar and other chrome: goes to the active pane while split. */
+  go: (target: string) => void;
+  setLayout: (layout: PaneLayout) => void;
+  /** Leave split view and continue in the full view at `target`. */
+  exitPanes: (target: string) => void;
   goBack: () => void;
   goForward: () => void;
   goUp: () => void;
@@ -413,7 +426,7 @@ function capShellIcons(map: Record<string, string>): Record<string, string> {
  * Entries whose own Windows icon says more than a generic document glyph:
  * shortcuts and executables, plus Office/PDF/ebook documents.
  */
-const SHELL_ICON_EXTENSIONS = new Set([
+export const SHELL_ICON_EXTENSIONS = new Set([
   "lnk",
   "url",
   "exe",
@@ -470,6 +483,7 @@ const PREF = {
   /** Marks the one-time widening from the old folder-only default. */
   searchScopeMigrated: "oriel:pref-search-scope-v2",
   group: "oriel:pref-group",
+  layout: "oriel:pref-layout",
 } as const;
 
 function readString<T extends string>(
@@ -492,6 +506,10 @@ function readBoolean(key: string, fallback: boolean): boolean {
   } catch {
     return fallback;
   }
+}
+
+function readLayout(): PaneLayout {
+  return readString<PaneLayout>(PREF.layout, "1", ["1", "2", "4"]);
 }
 
 function writePreference(key: string, value: string | boolean): void {
@@ -517,6 +535,17 @@ function closeSearchStream(): void {
   if (searchTimer) {
     clearTimeout(searchTimer);
     searchTimer = undefined;
+  }
+}
+
+/** Split panes keep their own listing, so a global transfer must tell them
+ * (twice: the task writes files asynchronously). */
+function refreshPanesSoon(): void {
+  if (typeof window === "undefined") return;
+  for (const delay of [600, 1600]) {
+    window.setTimeout(() => {
+      window.dispatchEvent(new Event("oriel:panes-refresh"));
+    }, delay);
   }
 }
 /** Monotonic token: only the newest `navigate` may commit its response. */
@@ -742,6 +771,8 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
   loading: false,
   error: null,
   online: null,
+  layout: readLayout(),
+  paneActivePath: "",
 
   history: [],
   historyIndex: -1,
@@ -897,6 +928,7 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
           loading: false,
           selected: [],
           anchor: null,
+          paneActivePath: response.path,
           history,
           historyIndex,
           view: saved?.view ?? state.view,
@@ -924,6 +956,30 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
         ...(offline ? { online: false } : {}),
       });
     }
+  },
+
+  go(target) {
+    const { layout } = get();
+    if (layout !== "1" && paneBridge.active) {
+      paneBridge.active.navigate(target);
+      return;
+    }
+    void get().navigate(target);
+  },
+
+  setLayout(layout) {
+    set({
+      layout,
+      paneActivePath:
+        layout === "1" ? get().paneActivePath : get().paneActivePath || get().path,
+    });
+    writePreference(PREF.layout, layout);
+  },
+
+  exitPanes(target) {
+    set({ layout: "1", paneActivePath: target });
+    writePreference(PREF.layout, "1");
+    if (target) void get().navigate(target, { history: "replace" });
   },
 
   goBack() {
@@ -1111,6 +1167,7 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
 
   closeSettings() {
     set({ route: "files" });
+    if (get().layout !== "1") return;
     const { path } = get();
     if (path) void get().navigate(path, { history: "none" });
   },
@@ -1131,6 +1188,7 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
 
   closeRecycle() {
     set({ route: "files" });
+    if (get().layout !== "1") return;
     const { path } = get();
     if (path) void get().navigate(path, { history: "none" });
   },
@@ -1567,7 +1625,8 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
       return;
     }
     const platform = get().system?.platform ?? "win32";
-    const current = get().path;
+    const current =
+      get().layout === "1" ? get().path : get().paneActivePath || get().path;
 
     // Dropping something back where it already lives, or into its own subtree,
     // is a no-op that would otherwise spam the task list with failures.
@@ -1610,6 +1669,7 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
 
       pendingTarget.set(task.id, target);
       watchTask(task.id, get);
+      if (get().layout !== "1") refreshPanesSoon();
 
       const sources = [...paths];
       pendingUndo.set(task.id, {

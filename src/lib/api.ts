@@ -10,6 +10,7 @@ import type {
   ListResponse,
   PreviewResponse,
   RecycleListResponse,
+  PortListResponse,
   UpdateInfoDto,
   SearchResponse,
   SpecialFolderDto,
@@ -105,6 +106,14 @@ export const api = {
 
   /** Installed font families, for the appearance settings. */
   fonts: () => request<{ fonts: string[] }>("/system/fonts"),
+
+  /** Listening TCP/UDP endpoints with their owning processes. */
+  ports: (refresh = false) =>
+    request<PortListResponse>(`/system/ports${refresh ? "?refresh=1" : ""}`),
+
+  /** Ends the process that owns a port. */
+  killPortProcess: (pid: number) =>
+    post<{ ok: true; pid: number }>("/system/ports/kill", { pid }),
 
   list: (path: string, showHidden = false) =>
     request<ListResponse>(`/fs/list${query({ path, showHidden })}`),

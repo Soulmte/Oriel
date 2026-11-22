@@ -24,6 +24,7 @@
         </a>
         <nav class="nav__links" aria-label="主导航">
           <a href="#features">功能</a>
+          <a href="#tools">工具</a>
           <a href="#compare">对比</a>
           <a href="#shots">界面</a>
           <a href="./docs.html">使用指南</a>
@@ -57,6 +58,10 @@
               <div>
                 <dt>预览</dt>
                 <dd>选中按空格，文档和视频直接看</dd>
+              </div>
+              <div>
+                <dt>分区</dt>
+                <dd>左右两格或四宫格，一起看</dd>
               </div>
               <div>
                 <dt>更新</dt>
@@ -183,6 +188,66 @@
         </div>
       </section>
 
+      <section class="section" id="tools">
+        <div class="wrap">
+          <header class="section__head">
+            <p class="kicker">两个顺手的小工具</p>
+            <h2>对着看文件夹，也看清谁占了端口</h2>
+            <p class="section__lede">
+              整理资料时常要两个文件夹来回看；某个端口起不来时，又得翻命令行找进程。
+              这两件事现在都在同一个窗口里。
+            </p>
+          </header>
+
+          <div class="features features--two">
+            <article class="feature">
+              <h3>分区查看</h3>
+              <p>
+                左右两格或四宫格，每个窗格独立导航、视图和排序。
+                文件可以直接拖到另一个窗格，也可以复制、剪切、粘贴。
+                侧边栏跟着当前窗格走，随时切回单窗格。
+              </p>
+              <div class="split-demo" aria-hidden="true">
+                <div class="split-demo__pane">
+                  <span class="split-demo__bar"></span>
+                  <span class="split-demo__row">项目资料</span>
+                  <span class="split-demo__row split-demo__row--active">2026-11 归档</span>
+                  <span class="split-demo__row">照片</span>
+                </div>
+                <div class="split-demo__pane">
+                  <span class="split-demo__bar"></span>
+                  <span class="split-demo__row">合同</span>
+                  <span class="split-demo__row">发票</span>
+                  <span class="split-demo__row">旧版本</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="feature">
+              <h3>端口进程</h3>
+              <p>
+                列出正在监听的 TCP 和 UDP 端口，按端口、进程名或 PID 搜索。
+                看到进程路径，确认之后直接结束。Oriel 自己的服务和系统进程受保护。
+              </p>
+              <div class="port-demo" aria-hidden="true">
+                <div class="port-demo__row port-demo__head">
+                  <span>端口</span><span>进程</span><span>操作</span>
+                </div>
+                <div class="port-demo__row">
+                  <span>8787</span><span>node · 本地服务</span><span>受保护</span>
+                </div>
+                <div class="port-demo__row">
+                  <span>3000</span><span>node</span><span class="port-demo__action">关闭</span>
+                </div>
+                <div class="port-demo__row">
+                  <span>445</span><span>System</span><span>—</span>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <section class="section section--alt" id="compare">
         <div class="wrap">
           <header class="section__head">
@@ -249,6 +314,20 @@
                   <td data-label="Windows 资源管理器">部分场景记住视图</td>
                   <td data-label="Oriel" class="is-ori">
                     每个文件夹各自记住视图、排序、分组和滚动位置
+                  </td>
+                </tr>
+                <tr>
+                  <td>多文件夹对照</td>
+                  <td data-label="Windows 资源管理器">开多个窗口，手动摆位置</td>
+                  <td data-label="Oriel" class="is-ori">
+                    左右两格或四宫格，共享侧边栏和剪贴板
+                  </td>
+                </tr>
+                <tr>
+                  <td>端口占用</td>
+                  <td data-label="Windows 资源管理器">资源监视器或命令行</td>
+                  <td data-label="Oriel" class="is-ori">
+                    设置里的端口进程页，可搜索并结束
                   </td>
                 </tr>
                 <tr>

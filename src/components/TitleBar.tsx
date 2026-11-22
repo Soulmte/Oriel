@@ -50,24 +50,27 @@ function CaptionButton({
 export function TitleBar() {
   const route = useExplorer((state) => state.route);
   const path = useExplorer((state) => state.path);
+  const layout = useExplorer((state) => state.layout);
+  const paneActivePath = useExplorer((state) => state.paneActivePath);
   const drives = useExplorer((state) => state.drives);
+  const displayPath = layout === "1" ? path : paneActivePath || path;
 
   const title = useMemo(() => {
     if (route === "settings") return "设置";
     if (route === "recycle") return "废纸篓";
-    if (!path) return "Oriel";
-    if (isArchivePath(path)) {
-      const { archive, inner } = parseArchivePath(path);
+    if (!displayPath) return "Oriel";
+    if (isArchivePath(displayPath)) {
+      const { archive, inner } = parseArchivePath(displayPath);
       const archiveName = basename(archive);
       const leaf = inner.split("\\").filter(Boolean).pop();
       return leaf ? `${archiveName} › ${leaf}` : archiveName;
     }
     const drive = drives.find(
-      (item) => item.path.toLowerCase() === path.toLowerCase(),
+      (item) => item.path.toLowerCase() === displayPath.toLowerCase(),
     );
     if (drive) return drive.label || drive.name;
-    return basename(path);
-  }, [route, path, drives]);
+    return basename(displayPath);
+  }, [route, displayPath, drives]);
 
   return (
     <header

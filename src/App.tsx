@@ -18,10 +18,12 @@ import { ToastHost } from "./components/ToastHost";
 import { SettingsPage } from "./components/SettingsPage";
 import { RecycleBin } from "./components/RecycleBin";
 import { OperationsPanel } from "./components/OperationsPanel";
+import { MultiPane } from "./components/multi/MultiPane";
 
 function ExplorerShell() {
   const init = useExplorer((state) => state.init);
   const route = useExplorer((state) => state.route);
+  const layout = useExplorer((state) => state.layout);
 
   useEffect(() => {
     void init();
@@ -51,6 +53,8 @@ function ExplorerShell() {
             <SettingsPage />
           ) : route === "recycle" ? (
             <RecycleBin />
+          ) : layout !== "1" ? (
+            <MultiPane />
           ) : (
             <>
               <Toolbar />

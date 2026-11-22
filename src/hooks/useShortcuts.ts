@@ -50,6 +50,10 @@ export function useShortcuts() {
         return;
       }
 
+      // Split view owns its own selection, navigation and menus. Let the
+      // focused pane handle the key; only global actions above still apply.
+      if (state.layout !== "1") return;
+
       if (ctrl && key === "f") {
         event.preventDefault();
         const input = document.querySelector<HTMLInputElement>("[data-search-input]");

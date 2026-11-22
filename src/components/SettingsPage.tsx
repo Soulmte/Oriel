@@ -8,6 +8,7 @@ import {
   SFGearshapeFill,
   SFLine3Horizontal,
   SFListBullet,
+  SFNetwork,
 } from "sf-symbols-lib/dualtone";
 import { useExplorer } from "../store/explorer";
 import { SettingsAppearance } from "./settings/SettingsAppearance";
@@ -16,8 +17,16 @@ import { SettingsContextMenu } from "./settings/SettingsContextMenu";
 import { SettingsService } from "./settings/SettingsService";
 import { SettingsAbout } from "./settings/SettingsAbout";
 import { SettingsSystem } from "./settings/SettingsSystem";
+import { SettingsPorts } from "./settings/SettingsPorts";
 
-type SectionId = "appearance" | "browsing" | "menu" | "system" | "service" | "about";
+type SectionId =
+  | "appearance"
+  | "browsing"
+  | "menu"
+  | "system"
+  | "service"
+  | "ports"
+  | "about";
 
 const SECTIONS: Array<{
   id: SectionId;
@@ -29,14 +38,15 @@ const SECTIONS: Array<{
   { id: "menu", label: "右键菜单", Icon: SFLine3Horizontal },
   { id: "system", label: "系统", Icon: SFGearshapeFill },
   { id: "service", label: "本地服务", Icon: SFExternaldriveFill },
+  { id: "ports", label: "端口进程", Icon: SFNetwork },
   { id: "about", label: "关于", Icon: SFInfoCircle },
 ];
 
-const SECTION_KEY = "oriel:pref-settings-section";
+export const SETTINGS_SECTION_KEY = "oriel:pref-settings-section";
 
 function readSection(): SectionId {
   try {
-    const raw = localStorage.getItem(SECTION_KEY);
+    const raw = localStorage.getItem(SETTINGS_SECTION_KEY);
     if (raw && SECTIONS.some((section) => section.id === raw)) {
       return raw as SectionId;
     }
@@ -52,11 +62,23 @@ export function SettingsPage() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(SECTION_KEY, section);
+      localStorage.setItem(SETTINGS_SECTION_KEY, section);
     } catch {
       // Persisting the page choice is best effort.
     }
   }, [section]);
+
+  // The sidebar shortcut can switch the page while Settings is already open.
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail;
+      if (detail && SECTIONS.some((item) => item.id === detail)) {
+        setSection(detail as SectionId);
+      }
+    };
+    window.addEventListener("oriel:settings-section", handler);
+    return () => window.removeEventListener("oriel:settings-section", handler);
+  }, []);
 
   return (
     <div className="flex min-h-0 flex-1 bg-mac-surface">
@@ -100,6 +122,7 @@ export function SettingsPage() {
           {section === "menu" && <SettingsContextMenu />}
           {section === "system" && <SettingsSystem />}
           {section === "service" && <SettingsService />}
+          {section === "ports" && <SettingsPorts />}
           {section === "about" && <SettingsAbout />}
         </div>
       </div>

@@ -194,6 +194,8 @@ export function Toolbar() {
   const notify = useExplorer((state) => state.notify);
   const appearance = useExplorer((state) => state.appearance);
   const setAppearance = useExplorer((state) => state.setAppearance);
+  const layout = useExplorer((state) => state.layout);
+  const setLayout = useExplorer((state) => state.setLayout);
 
   /** Collapse text labels when the window (or the UI scale) gets narrow. */
   const bar = useRef<HTMLDivElement>(null);
@@ -248,12 +250,28 @@ export function Toolbar() {
         case "refresh":
           reload();
           break;
+        case "layout-2":
+          setLayout("2");
+          break;
+        case "layout-4":
+          setLayout("4");
+          break;
         case "settings":
           openSettings();
           break;
       }
     },
-    [openSettings, openTerminal, notify, path, reload, reveal, setShowHidden, showHidden],
+    [
+      openSettings,
+      openTerminal,
+      notify,
+      path,
+      reload,
+      reveal,
+      setLayout,
+      setShowHidden,
+      showHidden,
+    ],
   );
 
   const handleViewOption = (key: Key) => {
@@ -584,6 +602,15 @@ export function Toolbar() {
               <Dropdown.Item id="copy-path" textValue="复制当前路径" isDisabled={!path}>
                 <SFLink size={14} className="shrink-0 text-muted" />
                 <Label>复制当前路径</Label>
+              </Dropdown.Item>
+              <Separator />
+              <Dropdown.Item id="layout-2" textValue="双窗格（左右）">
+                <Label>分区：左右两格</Label>
+                {layout === "2" && <SFCheckmark size={14} className="ml-auto text-muted" />}
+              </Dropdown.Item>
+              <Dropdown.Item id="layout-4" textValue="四窗格">
+                <Label>分区：四宫格</Label>
+                {layout === "4" && <SFCheckmark size={14} className="ml-auto text-muted" />}
               </Dropdown.Item>
               <Separator />
               <Dropdown.Item id="refresh" textValue="刷新">

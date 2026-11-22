@@ -1,6 +1,6 @@
 [package]
 name = "oriel"
-version = "0.1.2"
+version = "0.1.3"
 description = "A Finder-style file manager for Windows"
 authors = ["Oriel"]
 edition = "2021"

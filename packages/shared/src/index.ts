@@ -4,7 +4,7 @@
  */
 
 export const APP_NAME = "Oriel";
-export const APP_VERSION = "0.1.2";
+export const APP_VERSION = "0.1.3";
 export const DEFAULT_API_PORT = 8787;
 export const DEFAULT_API_BASE_URL = `http://127.0.0.1:${DEFAULT_API_PORT}`;
 
@@ -217,6 +217,28 @@ export interface HealthResponse {
   name: string;
   version: string;
   uptime: number;
+}
+
+/** One listening TCP/UDP endpoint and the process that owns it. */
+export interface PortEntryDto {
+  protocol: "TCP" | "UDP";
+  /** `0.0.0.0`, `127.0.0.1`, `::`, … */
+  address: string;
+  port: number;
+  pid: number;
+  /** Executable name without the extension, e.g. `chrome`. */
+  process: string;
+  /** Full executable path when Windows exposes it. */
+  path: string | null;
+  /** True for the service that powers Oriel itself. */
+  oriel: boolean;
+}
+
+export interface PortListResponse {
+  items: PortEntryDto[];
+  platform: string;
+  /** Populated when the platform cannot enumerate endpoints. */
+  note: string | null;
 }
 
 export const SEARCH_MIN_QUERY_LENGTH = 1;

@@ -19,6 +19,7 @@ import { Meter } from "@heroui/react";
 import { clsx } from "clsx";
 import type { DriveKind } from "@oriel/shared";
 import { useExplorer } from "../store/explorer";
+import { SETTINGS_SECTION_KEY } from "./SettingsPage";
 import { useDropTarget } from "../hooks/useDropTarget";
 import { dragKind } from "../lib/dnd";
 import { formatBytes, samePath, startsWithPath } from "../lib/format";
@@ -88,7 +89,7 @@ function SidebarItem({
   dropPath?: string;
 }) {
   const dropPaths = useExplorer((state) => state.dropPaths);
-  const navigate = useExplorer((state) => state.navigate);
+  const go = useExplorer((state) => state.go);
 
   const drop = useDropTarget({
     enabled: Boolean(dropPath),
@@ -96,7 +97,7 @@ function SidebarItem({
       if (dropPath) void dropPaths(paths, dropPath, dragKind(event));
     },
     onHover: () => {
-      if (dropPath) void navigate(dropPath);
+      if (dropPath) go(dropPath);
     },
   });
 
@@ -131,13 +132,16 @@ function SidebarItem({
 export function Sidebar() {
   const route = useExplorer((state) => state.route);
   const path = useExplorer((state) => state.path);
+  const layout = useExplorer((state) => state.layout);
+  const paneActivePath = useExplorer((state) => state.paneActivePath);
   const specials = useExplorer((state) => state.specials);
   const drives = useExplorer((state) => state.drives);
   const platform = useExplorer((state) => state.system?.platform ?? "win32");
-  const navigate = useExplorer((state) => state.navigate);
+  const go = useExplorer((state) => state.go);
   const openSettings = useExplorer((state) => state.openSettings);
   const openRecycle = useExplorer((state) => state.openRecycle);
   const layoutEpoch = useExplorer((state) => state.layoutEpoch);
+  const displayPath = layout === "1" ? path : paneActivePath || path;
 
   const [width, setWidth] = useState(readWidth);
   const widthRef = useRef(width);
@@ -146,11 +150,11 @@ export function Sidebar() {
   widthRef.current = width;
 
   const currentDrive = useMemo(() => {
-    if (!path) return undefined;
+    if (!displayPath) return undefined;
     return drives
-      .filter((drive) => startsWithPath(path, drive.path, platform))
+      .filter((drive) => startsWithPath(displayPath, drive.path, platform))
       .sort((a, b) => b.path.length - a.path.length)[0];
-  }, [drives, path, platform]);
+  }, [drives, displayPath, platform]);
 
   // Two unlabelled volumes are both called “本地磁盘”; the drive letter is the
   // only thing that tells them apart, so add it when the label is ambiguous.
@@ -176,6 +180,26 @@ export function Sidebar() {
     : 0;
   const meterColor: "accent" | "warning" | "danger" =
     usage >= 90 ? "danger" : usage >= 70 ? "warning" : "accent";
+
+  const openPorts = () => {
+    try {
+      localStorage.setItem(SETTINGS_SECTION_KEY, "ports");
+    } catch {
+      // Opening the page still works without remembering the section.
+    }
+    window.dispatchEvent(
+      new CustomEvent("oriel:settings-section", { detail: "ports" }),
+    );
+    openSettings();
+  };
+  const portsActive = (() => {
+    if (route !== "settings") return false;
+    try {
+      return localStorage.getItem(SETTINGS_SECTION_KEY) === "ports";
+    } catch {
+      return false;
+    }
+  })();
 
   const startResize = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -247,7 +271,7 @@ export function Sidebar() {
               tint: "text-[#3d9bff]",
             };
             const active =
-              route === "files" && samePath(path, folder.path, platform);
+              route === "files" && samePath(displayPath, folder.path, platform);
             return (
               <SidebarItem
                 key={folder.id}
@@ -255,7 +279,7 @@ export function Sidebar() {
                 label={folder.name}
                 title={folder.path}
                 dropPath={folder.path}
-                onSelect={() => void navigate(folder.path)}
+                onSelect={() => go(folder.path)}
                 icon={
                   <spec.Icon size={16} className={clsx("shrink-0", spec.tint)} />
                 }
@@ -271,7 +295,7 @@ export function Sidebar() {
           )}
           {drives.map((drive) => {
             const active =
-              route === "files" && samePath(path, drive.path, platform);
+              route === "files" && samePath(displayPath, drive.path, platform);
             const icon = DRIVE_ICONS[drive.kind] ?? DRIVE_ICONS.unknown;
             const filled = drive.total > 0;
             const percent = filled
@@ -288,7 +312,7 @@ export function Sidebar() {
                 label={driveLabels.get(drive.path) ?? drive.label ?? drive.name}
                 title={detail}
                 dropPath={drive.path}
-                onSelect={() => void navigate(drive.path)}
+                onSelect={() => go(drive.path)}
                 icon={<icon.Icon size={16} className={clsx("shrink-0", icon.tint)} />}
                 trailing={
                   filled ? (
@@ -313,6 +337,17 @@ export function Sidebar() {
             icon={<SFTrashFill size={16} className="shrink-0 text-[#98989f]" />}
           />
         </div>
+
+        <p className={SECTION_CLASS}>工具</p>
+        <div className="flex flex-col gap-0.5">
+          <SidebarItem
+            active={portsActive}
+            label="端口进程"
+            title="查看并结束占用端口的进程"
+            onSelect={openPorts}
+            icon={<SFNetwork size={16} className="shrink-0 text-[#5e5ce6]" />}
+          />
+        </div>
       </div>
 
       <div className="flex flex-col gap-1.5 border-t border-mac-line p-2">
@@ -321,11 +356,11 @@ export function Sidebar() {
             role="button"
             tabIndex={0}
             title={`${currentDrive.name} · 已用 ${formatBytes(currentDrive.used)} / 共 ${formatBytes(currentDrive.total)}`}
-            onClick={() => void navigate(currentDrive.path)}
+            onClick={() => go(currentDrive.path)}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
-                void navigate(currentDrive.path);
+                go(currentDrive.path);
               }
             }}
             className="cursor-default rounded-[8px] bg-black/[0.04] p-2 outline-none transition-colors hover:bg-black/[0.07] focus-visible:ring-2 focus-visible:ring-mac-blue/60 dark:bg-white/[0.05] dark:hover:bg-white/[0.08]"

@@ -9,6 +9,7 @@ import { listSpecialFolders } from "../lib/special.js";
 import { listFonts } from "../lib/fonts.js";
 import { ApiError } from "../errors.js";
 import { checkForUpdate } from "../lib/update.js";
+import { killPortProcess, listPorts } from "../lib/ports.js";
 import { createDownload } from "../lib/tasks.js";
 
 export const systemRoutes: FastifyPluginAsync = async (app) => {
@@ -35,6 +36,20 @@ export const systemRoutes: FastifyPluginAsync = async (app) => {
 
   /** Installed font families, used by the appearance settings. */
   app.get("/system/fonts", async () => ({ fonts: await listFonts() }));
+
+  /** Listening TCP/UDP endpoints and their owning processes. */
+  app.get("/system/ports", async (request) => {
+    const query = request.query as Record<string, string | undefined>;
+    return listPorts(query.refresh === "1" || query.refresh === "true");
+  });
+
+  /** Ends the process that owns a port. Refuses Oriel's own processes. */
+  app.post("/system/ports/kill", async (request) => {
+    const body = (request.body ?? {}) as Record<string, unknown>;
+    const pid = Number(body.pid);
+    await killPortProcess(pid);
+    return { ok: true as const, pid };
+  });
 
   /** Latest GitHub release, used by the update section in the settings. */
   app.get("/app/update", async (request) => {
