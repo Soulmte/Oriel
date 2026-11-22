@@ -66,6 +66,34 @@ Release 正文来自 `docs/release-notes/<tag>.md`（例如 `docs/release-notes/
 跳过该版本（跳过记录在 localStorage，出现更新版本时会重新提示）。设置 → 关于 里保留
 完整更新日志和手动检查。
 
+### Gitee manifest
+
+Gitee 的 REST API 前面有 WAF，十几次匿名请求就会返回 `403 Rate Limit Exceeded`，所以
+客户端**不把 Gitee API 当作主路径**。发布流程在创建 Release 后会自动生成仓库根目录的
+`update.json` 并提交到 `main`：
+
+```json
+{
+  "tag": "v0.1.5",
+  "name": "Oriel v0.1.5",
+  "publishedAt": "2026-11-22T13:34:47.339Z",
+  "notes": "...更新日志 Markdown...",
+  "assets": [
+    { "name": "Oriel_0.1.5_x64-setup.exe", "size": 2674110 }
+  ]
+}
+```
+
+客户端读取 `https://gitee.com/rain-drops/oriel/raw/main/update.json`（raw 文件不受限
+流），再用 `releases/download/<tag>/<文件名>` 拼出下载地址。这样即使 Gitee API 被拦、
+GitHub 也不通，国内用户依然能看到新版本并下载。API 结果只在 manifest 缺失时使用。
+
+手动生成（例如补发旧版本）：
+
+```bash
+node scripts/update-manifest.mjs v0.1.5 src-tauri/target/release/bundle docs/release-notes
+```
+
 CDN 目录结构（发布 job 已按此布局上传）：
 
 ```

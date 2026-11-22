@@ -66,6 +66,27 @@ jobs:
           body_path: ${{ steps.notes.outputs.path }}
           generate_release_notes: ${{ steps.notes.outputs.path == '' }}
 
+      # Gitee's REST API is rate limited hard enough that the updater cannot
+      # rely on it, so mirror the release into a static file the client reads
+      # through the raw endpoint instead.
+      - name: Publish the mirror manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          git checkout -B manifest origin/main
+          node scripts/update-manifest.mjs "$GITHUB_REF_NAME" \
+            src-tauri/target/release/bundle docs/release-notes
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add update.json
+          if git diff --cached --quiet; then
+            echo "manifest unchanged"
+            exit 0
+          fi
+          git commit -m "Update mirror manifest for ${GITHUB_REF_NAME}"
+          git push origin manifest:main
+
   # The China-facing mirror. Code/tags are pushed to Gitee and the same
   # installers are attached to a Gitee release, so the in-app updater can fall
   # back to gitee.com when github.com is slow or blocked.

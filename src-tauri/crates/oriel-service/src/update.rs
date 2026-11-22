@@ -9,8 +9,6 @@ use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
-use oriel_core::CoreError;
-
 /// Runtime values win; otherwise use the value baked in by the release build.
 /// The workflow sets these during `tauri build`, so shipped installers carry
 /// the CDN/Gitee mirror without relying on the user's environment.
@@ -268,6 +266,57 @@ fn gitee_release(repository: &str) -> Option<Release> {
     })
 }
 
+/// The Gitee REST API sits behind a WAF that answers 403 after only a handful
+/// of anonymous calls. The mirror therefore also publishes `update.json` on
+/// `main`: a raw file has no such limit and carries the sizes the API omits.
+fn gitee_manifest(repository: &str) -> Option<Release> {
+    let value = fetch(&format!(
+        "https://gitee.com/{repository}/raw/main/update.json"
+    ))?;
+    manifest_from_value(repository, &value)
+}
+
+fn manifest_from_value(repository: &str, value: &Value) -> Option<Release> {
+    let tag = value.get("tag")?.as_str()?.trim().to_string();
+    if tag.is_empty() {
+        return None;
+    }
+
+    let assets = value
+        .get("assets")
+        .and_then(|assets| assets.as_array())
+        .map(|assets| {
+            assets
+                .iter()
+                .filter_map(|asset| {
+                    let name = asset.get("name")?.as_str()?.to_string();
+                    let size = asset.get("size").and_then(|size| size.as_u64()).unwrap_or(0);
+                    // Gitee serves release attachments from this fixed layout.
+                    let url = format!(
+                        "https://gitee.com/{repository}/releases/download/{tag}/{name}"
+                    );
+                    Some((name, url, size))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    Some(Release {
+        tag: tag.clone(),
+        name: value.get("name").and_then(|name| name.as_str()).map(str::to_string),
+        notes: value
+            .get("notes")
+            .and_then(|notes| notes.as_str())
+            .map(str::to_string),
+        published: value
+            .get("publishedAt")
+            .and_then(|at| at.as_str())
+            .map(str::to_string),
+        html_url: Some(format!("https://gitee.com/{repository}/releases/tag/{tag}")),
+        assets,
+    })
+}
+
 fn cache() -> &'static Mutex<Option<(Instant, String, Value)>> {
     static CACHE: OnceLock<Mutex<Option<(Instant, String, Value)>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(None))
@@ -331,14 +380,32 @@ fn fetch_and_build(current: &str) -> Value {
     }
     let gitee_id = gitee_repo();
 
-    // GitHub can hang for a long time behind the GFW; querying both in parallel
-    // means a blocked GitHub costs one short timeout instead of two serial ones.
-    let (github, gitee) = std::thread::scope(|scope| {
+    // GitHub can hang for a long time behind the GFW; querying everything in
+    // parallel means a blocked source costs one short timeout, not three
+    // serial ones. The manifest is preferred over the API: it survives the
+    // WAF and still knows each installer's size.
+    let (github, gitee_api, gitee_file) = std::thread::scope(|scope| {
         let github = scope.spawn(|| github_release(&github_id));
-        let gitee = scope.spawn(|| gitee_release(&gitee_id));
-        (github.join().ok().flatten(), gitee.join().ok().flatten())
+        let api = scope.spawn(|| gitee_release(&gitee_id));
+        let file = scope.spawn(|| gitee_manifest(&gitee_id));
+        (
+            github.join().ok().flatten(),
+            api.join().ok().flatten(),
+            file.join().ok().flatten(),
+        )
     });
     let github_ok = github.is_some();
+
+    let gitee = match (gitee_file, gitee_api) {
+        (Some(file), Some(api)) => {
+            if is_newer(&api.tag, &file.tag) {
+                Some(api)
+            } else {
+                Some(file)
+            }
+        }
+        (file, api) => file.or(api),
+    };
 
     let primary = match (&github, &gitee) {
         (Some(github), Some(gitee)) => {
@@ -451,38 +518,49 @@ fn fetch_and_build(current: &str) -> Value {
     })
 }
 
-pub fn download(urls: &[String], name: &str) -> Result<std::path::PathBuf, CoreError> {
-    let safe_name = name
-        .chars()
-        .map(|c| if matches!(c, '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|') { '_' } else { c })
-        .collect::<String>();
-    let destination = std::env::temp_dir().join(if safe_name.trim().is_empty() {
-        "oriel-update.bin".to_string()
-    } else {
-        safe_name
-    });
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let mut last_error = String::new();
-    for url in urls {
-        match ureq::get(url).timeout(Duration::from_secs(30)).call() {
-            Ok(response) => {
-                let mut file = std::fs::File::create(&destination)
-                    .map_err(|error| CoreError::internal(error.to_string()))?;
-                let mut reader = response.into_reader();
-                std::io::copy(&mut reader, &mut file)
-                    .map_err(|error| CoreError::internal(error.to_string()))?;
-                return Ok(destination);
-            }
-            Err(error) => last_error = error.to_string(),
-        }
+    #[test]
+    fn manifest_assets_become_gitee_download_urls() {
+        let value = json!({
+            "tag": "v0.1.5",
+            "name": "Oriel v0.1.5",
+            "notes": "hello",
+            "publishedAt": "2026-01-01T00:00:00Z",
+            "assets": [
+                { "name": "Oriel_0.1.5_x64-setup.exe", "size": 123 },
+                { "name": "Oriel_0.1.5_x64_en-US.msi", "size": 456 }
+            ]
+        });
+
+        let release = manifest_from_value("rain-drops/oriel", &value).expect("manifest");
+        assert_eq!(release.tag, "v0.1.5");
+        assert_eq!(release.assets.len(), 2);
+        assert_eq!(release.assets[0].0, "Oriel_0.1.5_x64-setup.exe");
+        assert_eq!(release.assets[0].2, 123);
+        assert_eq!(
+            release.assets[0].1,
+            "https://gitee.com/rain-drops/oriel/releases/download/v0.1.5/Oriel_0.1.5_x64-setup.exe"
+        );
+        assert_eq!(
+            release.html_url.as_deref(),
+            Some("https://gitee.com/rain-drops/oriel/releases/tag/v0.1.5")
+        );
     }
 
-    Err(CoreError::bad_request(
-        "DOWNLOAD_FAILED",
-        if last_error.is_empty() {
-            "下载失败".to_string()
-        } else {
-            format!("下载失败：{last_error}")
-        },
-    ))
+    #[test]
+    fn manifest_without_a_tag_is_ignored() {
+        let value = json!({ "assets": [] });
+        assert!(manifest_from_value("rain-drops/oriel", &value).is_none());
+    }
+
+    #[test]
+    fn version_compare_ignores_the_v_prefix() {
+        assert!(is_newer("v0.1.5", "0.1.4"));
+        assert!(!is_newer("v0.1.4", "0.1.4"));
+        assert!(is_newer("0.2.0", "0.1.9"));
+        assert!(is_newer("0.1.10", "0.1.9"));
+    }
 }

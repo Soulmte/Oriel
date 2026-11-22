@@ -444,9 +444,15 @@ pub fn find_conflicts(sources: &[String], target: &str) -> Vec<(String, String)>
 
 /// Downloads an update asset into the temp folder as a tracked task, trying the
 /// CDN, the Gitee mirror and GitHub in the order the caller supplied.
+/// `install_update` only launches installers from this folder, so downloads
+/// must land in it.
+const UPDATE_DIR: &str = "oriel-updates";
+
 pub fn create_download(urls: Vec<String>, name: String, expected_size: u64) -> Task {
     let id = new_id();
-    let destination = std::env::temp_dir().join(sanitize(&name));
+    let directory = std::env::temp_dir().join(UPDATE_DIR);
+    let _ = std::fs::create_dir_all(&directory);
+    let destination = directory.join(sanitize(&name));
 
     let task = Task {
         id: id.clone(),

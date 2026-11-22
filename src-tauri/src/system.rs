@@ -437,9 +437,10 @@ pub fn install_update(app: AppHandle, path: String) -> Result<(), String> {
         return Err("安装包已不存在，请重新下载".into());
     }
     let allowed = std::env::temp_dir().join(UPDATE_DIR);
+    // Create it first: canonicalize fails with a bare OS error otherwise.
+    let _ = std::fs::create_dir_all(&allowed);
     let canonical = std::fs::canonicalize(&installer).map_err(|error| error.to_string())?;
-    let canonical_allowed =
-        std::fs::canonicalize(&allowed).map_err(|error| error.to_string())?;
+    let canonical_allowed = std::fs::canonicalize(&allowed).map_err(|error| error.to_string())?;
     if !canonical.starts_with(&canonical_allowed) {
         return Err("安装包不在更新目录中".into());
     }
@@ -450,15 +451,13 @@ pub fn install_update(app: AppHandle, path: String) -> Result<(), String> {
         .unwrap_or_default()
         .to_ascii_lowercase();
     let target = canonical.to_string_lossy().to_string();
+    // Launch the installer directly instead of going through `cmd /C start`:
+    // the shell mangles paths with non-ASCII characters or `&`.
     let mut command = match ext.as_str() {
-        "exe" => {
-            let mut command = Command::new("cmd");
-            command.args(["/C", "start", "", &target]);
-            command
-        }
+        "exe" => Command::new(&target),
         "msi" => {
-            let mut command = Command::new("cmd");
-            command.args(["/C", "start", "", "msiexec", "/i", &target]);
+            let mut command = Command::new("msiexec");
+            command.args(["/i", &target]);
             command
         }
         _ => return Err("不支持的安装包类型".into()),
