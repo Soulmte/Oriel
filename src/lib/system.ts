@@ -66,15 +66,15 @@ export async function writeFolderHandler(enabled: boolean): Promise<boolean> {
   return invoke<boolean>("set_folder_handler", { enabled });
 }
 
-/** Registers Oriel as a folder handler and opens Windows' Default apps page. */
+/** Takes over the shell's folder-open verb for the current user. */
 export async function writeDefaultHandler(enabled: boolean): Promise<boolean> {
   if (!isNativeShellAvailable()) return false;
   return invoke<boolean>("set_default_file_manager", { enabled });
 }
 
-export async function openDefaultAppsSettings(): Promise<void> {
+export async function openLogFolder(): Promise<void> {
   if (!isNativeShellAvailable()) return;
-  await invoke("open_default_apps");
+  await invoke("open_log_folder");
 }
 
 /** Kills and restarts the bundled local service. */

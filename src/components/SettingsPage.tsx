@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { clsx } from "clsx";
 import {
-  SFChevronLeft,
   SFDesktopcomputer,
-  SFExternaldriveFill,
+  SFFolder,
   SFInfoCircle,
   SFGearshapeFill,
   SFLine3Horizontal,
@@ -13,7 +12,6 @@ import { useExplorer } from "../store/explorer";
 import { SettingsAppearance } from "./settings/SettingsAppearance";
 import { SettingsBrowsing } from "./settings/SettingsBrowsing";
 import { SettingsContextMenu } from "./settings/SettingsContextMenu";
-import { SettingsService } from "./settings/SettingsService";
 import { SettingsAbout } from "./settings/SettingsAbout";
 import { SettingsSystem } from "./settings/SettingsSystem";
 
@@ -22,7 +20,6 @@ type SectionId =
   | "browsing"
   | "menu"
   | "system"
-  | "service"
   | "about";
 
 const SECTIONS: Array<{
@@ -34,7 +31,6 @@ const SECTIONS: Array<{
   { id: "browsing", label: "浏览", Icon: SFListBullet },
   { id: "menu", label: "右键菜单", Icon: SFLine3Horizontal },
   { id: "system", label: "系统", Icon: SFGearshapeFill },
-  { id: "service", label: "本地服务", Icon: SFExternaldriveFill },
   { id: "about", label: "关于", Icon: SFInfoCircle },
 ];
 
@@ -75,7 +71,7 @@ export function SettingsPage() {
           onClick={closeSettings}
           className="mb-2 flex items-center gap-1.5 rounded-[6px] px-2 py-1.5 text-[12px] text-mac-muted transition-colors hover:bg-black/[0.045] hover:text-mac-text dark:hover:bg-white/[0.06]"
         >
-          <SFChevronLeft size={13} />
+          <SFFolder size={13} className="shrink-0 text-mac-muted" />
           返回文件
         </button>
 
@@ -105,7 +101,6 @@ export function SettingsPage() {
           {section === "browsing" && <SettingsBrowsing />}
           {section === "menu" && <SettingsContextMenu />}
           {section === "system" && <SettingsSystem />}
-          {section === "service" && <SettingsService />}
           {section === "about" && <SettingsAbout />}
         </div>
       </div>

@@ -295,7 +295,7 @@ export function PortsPage() {
                                 {item.oriel ? (
                                   <span
                                     className="px-2 text-[11px] text-mac-muted"
-                                    title="请到「本地服务」里重启 Oriel 的服务"
+                                    title="Oriel 自己的进程，结束会让窗口失去响应"
                                   >
                                     受保护
                                   </span>

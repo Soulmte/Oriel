@@ -244,11 +244,15 @@ export function Dialogs() {
           ) : removeDialog ? (
             <>
               <Modal.Header className={HEADER}>
-                <Modal.Heading className={HEADING}>永久删除？</Modal.Heading>
+                <Modal.Heading className={HEADING}>
+                  {removeDialog.permanent ? "永久删除？" : "移到废纸篓？"}
+                </Modal.Heading>
               </Modal.Header>
               <Modal.Body className={BODY}>
                 <p className="text-center text-[12px] leading-5 text-mac-muted">
-                  将永久删除 {removeDialog.paths.length} 个项目，文件不会进入废纸篓，也无法撤销
+                  {removeDialog.permanent
+                    ? `将永久删除 ${removeDialog.paths.length} 个项目，文件不会进入废纸篓，也无法撤销`
+                    : `将把 ${removeDialog.paths.length} 个项目移到废纸篓，可以再还原`}
                 </p>
                 <ul className="mt-2 max-h-[116px] space-y-0.5 overflow-y-auto rounded-[8px] bg-black/[0.04] px-2.5 py-1.5 text-[12px] dark:bg-white/[0.06]">
                   {removeDialog.paths.slice(0, 6).map((item) => (
@@ -268,14 +272,15 @@ export function Dialogs() {
                   取消
                 </Button>
                 <Button
-                  className={DESTRUCTIVE}
+                  className={removeDialog.permanent ? DESTRUCTIVE : undefined}
                   onPress={() => {
                     const paths = [...removeDialog.paths];
+                    const permanent = removeDialog.permanent;
                     closeDialog();
-                    void performRemove(paths, true);
+                    void performRemove(paths, permanent);
                   }}
                 >
-                  永久删除
+                  {removeDialog.permanent ? "永久删除" : "移到废纸篓"}
                 </Button>
               </Modal.Footer>
             </>

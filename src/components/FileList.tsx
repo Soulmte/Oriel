@@ -3,6 +3,7 @@ import type { EntryDto, SortKey } from "@oriel/shared";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { clsx } from "clsx";
 import { useExplorer } from "../store/explorer";
+import type { ListColumnKey } from "../store/explorer";
 import { groupEntries } from "../lib/grouping";
 import { useInView } from "../hooks/useInView";
 import { useVirtualRows } from "../hooks/useVirtualRows";
@@ -31,25 +32,28 @@ const COLUMNS: Array<{ key: SortKey; label: string; className: string }> = [
 
 const DEFAULT_ROW_HEIGHT = 28;
 /**
- * Column sets chosen from the measured width of the scroll container. Media
- * queries cannot see the UI-scale `zoom`, so the width is read in JS instead.
+ * Column set from the measured width plus the user's column choices. Width
+ * still wins: a narrow window drops date/kind so the name never collapses.
  */
-function columnsFor(width: number): {
+function columnsFor(
+  width: number,
+  visible: ListColumnKey[],
+): {
   template: string;
   date: boolean;
+  size: boolean;
   kind: boolean;
 } {
-  if (width >= 680) {
-    return {
-      template: "grid-cols-[minmax(200px,1fr)_130px_78px_minmax(70px,110px)]",
-      date: true,
-      kind: true,
-    };
-  }
-  if (width >= 440) {
-    return { template: "grid-cols-[minmax(160px,1fr)_116px_72px]", date: true, kind: false };
-  }
-  return { template: "grid-cols-[minmax(140px,1fr)_72px]", date: false, kind: false };
+  const date = width >= 440 && visible.includes("date");
+  const size = visible.includes("size");
+  const kind = width >= 680 && visible.includes("kind");
+
+  const parts = ["minmax(150px, 1fr)"];
+  if (date) parts.push("130px");
+  if (size) parts.push("78px");
+  if (kind) parts.push("minmax(70px, 110px)");
+
+  return { template: parts.join(" "), date, size, kind };
 }
 
 /**
@@ -90,6 +94,7 @@ function ListRow({
   showExtensions,
   template,
   showDate,
+  showSize,
   showKind,
   rowHeight,
 }: {
@@ -98,6 +103,7 @@ function ListRow({
   showExtensions: boolean;
   template: string;
   showDate: boolean;
+  showSize: boolean;
   showKind: boolean;
   rowHeight: number;
 }) {
@@ -112,7 +118,8 @@ function ListRow({
   const navigate = useExplorer((state) => state.navigate);
   const dropPaths = useExplorer((state) => state.dropPaths);
   const platform = useExplorer((state) => state.system?.platform ?? "win32");
-  const openOnClick = useDoubleClickOpen(() => void openEntry(entry));
+  const singleClickOpen = useExplorer((state) => state.singleClickOpen);
+  const openOnClick = useDoubleClickOpen(() => void openEntry(entry), singleClickOpen);
 
   const drop = useDropTarget({
     enabled: entry.kind === "directory",
@@ -130,7 +137,7 @@ function ListRow({
       data-entry-path={entry.path}
       data-selected={isSelected}
       draggable
-      style={{ height: rowHeight }}
+      style={{ height: rowHeight, gridTemplateColumns: template }}
       onClick={(event) => {
         if (event.shiftKey) selectRange(entry.path);
         else if (event.ctrlKey || event.metaKey) toggleSelect(entry.path);
@@ -159,7 +166,6 @@ function ListRow({
       {...drop.dropProps}
       className={clsx(
         "grid cursor-default touch-manipulation items-center px-4 text-[12.5px]",
-        template,
         drop.active
           ? "bg-mac-blue/25 ring-1 ring-inset ring-mac-blue"
           : isSelected
@@ -183,18 +189,19 @@ function ListRow({
           {formatDate(entry.mtimeMs)}
         </div>
       )}
-      {entry.kind === "directory" ? (
-        <FolderSizeCell path={entry.path} selected={isSelected && !drop.active} />
-      ) : (
-        <div
-          className={clsx(
-            "px-1 text-right tabular-nums",
-            isSelected && !drop.active ? "text-white/80" : "text-mac-muted",
-          )}
-        >
-          {formatBytes(entry.size)}
-        </div>
-      )}
+      {showSize &&
+        (entry.kind === "directory" ? (
+          <FolderSizeCell path={entry.path} selected={isSelected && !drop.active} />
+        ) : (
+          <div
+            className={clsx(
+              "px-1 text-right tabular-nums",
+              isSelected && !drop.active ? "text-white/80" : "text-mac-muted",
+            )}
+          >
+            {formatBytes(entry.size)}
+          </div>
+        ))}
       {showKind && (
         <div
           className={clsx(
@@ -221,6 +228,7 @@ export function FileList({ entries }: { entries: EntryDto[] }) {
 
   const groupKey = useExplorer((state) => state.groupKey);
   const showExtensions = useExplorer((state) => state.appearance.showExtensions);
+  const listColumns = useExplorer((state) => state.listColumns);
   const density = useExplorer((state) => state.appearance.density);
   const rememberedScroll = useExplorer((state) => state.pendingScrollTop);
   const rememberScrollTop = useExplorer((state) => state.rememberScrollTop);
@@ -259,7 +267,7 @@ export function FileList({ entries }: { entries: EntryDto[] }) {
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   const virtual = useVirtualRows({ count: rowModel.length, rowHeight: ROW_HEIGHT });
-  const columns = columnsFor(containerWidth);
+  const columns = columnsFor(containerWidth, listColumns);
   const { ref, onScroll, first, last, rows } = virtual;
 
   const getSelection = useCallback(() => useExplorer.getState().selected, []);
@@ -334,12 +342,18 @@ export function FileList({ entries }: { entries: EntryDto[] }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div
+        style={{ gridTemplateColumns: columns.template }}
         className={clsx(
           "grid shrink-0 items-center border-b border-mac-line px-4 py-1 text-[11px] font-medium text-mac-muted",
-          columns.template,
         )}
       >
-        {COLUMNS.map((column) => (
+        {COLUMNS.filter(
+          (column) =>
+            column.key === "name" ||
+            (column.key === "date" && columns.date) ||
+            (column.key === "size" && columns.size) ||
+            (column.key === "kind" && columns.kind),
+        ).map((column) => (
           <button
             key={column.key}
             type="button"
@@ -347,8 +361,6 @@ export function FileList({ entries }: { entries: EntryDto[] }) {
             className={clsx(
               "flex items-center gap-1 px-1 text-left transition-colors hover:text-mac-text",
               column.className,
-              column.key === "kind" && !columns.kind && "hidden",
-              column.key === "date" && !columns.date && "hidden",
               column.className === "text-right" && "justify-end",
             )}
           >
@@ -410,6 +422,7 @@ export function FileList({ entries }: { entries: EntryDto[] }) {
                 showExtensions={showExtensions}
                 template={columns.template}
                 showDate={columns.date}
+                showSize={columns.size}
                 showKind={columns.kind}
                 rowHeight={ROW_HEIGHT}
               />

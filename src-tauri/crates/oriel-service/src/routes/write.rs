@@ -331,7 +331,14 @@ pub async fn retry_task(axum::extract::Path(id): axum::extract::Path<String>) ->
 }
 
 pub async fn open(Json(body): Json<OnePathBody>) -> ApiResult<Json<Value>> {
-    let target = require_path(body.path)?;
+    let raw = body.path.unwrap_or_default();
+    // Release pages and changelogs are URLs; everything else must be a real
+    // absolute path, which `normalize_path` enforces.
+    let target = if raw.trim().starts_with("http://") || raw.trim().starts_with("https://") {
+        raw.trim().to_string()
+    } else {
+        require_path(Some(raw))?
+    };
     tokio::task::spawn_blocking(move || fsops::open_with_system(&target))
         .await
         .map_err(|error| CoreError::internal(error.to_string()))??;

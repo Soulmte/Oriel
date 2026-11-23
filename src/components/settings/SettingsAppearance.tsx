@@ -276,17 +276,6 @@ export function SettingsAppearance() {
 
       <SettingsSection title="细节">
         <SettingsRow
-          title="显示文件扩展名"
-          detail="关闭后 `报告.docx` 显示为 `报告`，重命名时仍会带上扩展名"
-        >
-          <SettingsSwitch
-            label="显示文件扩展名"
-            selected={appearance.showExtensions}
-            onChange={(value) => setAppearance("showExtensions", value)}
-          />
-        </SettingsRow>
-
-        <SettingsRow
           title="动态效果"
           detail="关闭所有过渡与淡入动画，可减少视觉干扰与低配机器上的合成开销"
         >

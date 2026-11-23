@@ -6,11 +6,33 @@ use std::sync::atomic::Ordering;
 
 use tauri::{Emitter, Manager, RunEvent};
 
+/// Shells quote `%1` and some programs append a trailing separator, which
+/// leaves a stray quote or backslash in argv (`D:\dir\"` arrives as
+/// `D:\dir\"` minus the opening quote). Clean it up before probing the disk.
+fn path_arg(raw: &str) -> Option<String> {
+    let cleaned = raw.trim().trim_matches('"').trim();
+    if cleaned.is_empty() || cleaned.starts_with('-') {
+        return None;
+    }
+
+    let path = Path::new(cleaned);
+    if path.is_dir() {
+        return Some(cleaned.to_string());
+    }
+    // A file target (path link to a document) opens the folder that holds it.
+    if path.is_file() {
+        return path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .map(|parent| parent.to_string_lossy().to_string());
+    }
+    None
+}
+
 fn startup_paths() -> Vec<String> {
     std::env::args()
         .skip(1)
-        .filter(|arg| !arg.starts_with('-'))
-        .filter(|arg| Path::new(arg).is_dir())
+        .filter_map(|arg| path_arg(&arg))
         .collect()
 }
 
@@ -44,9 +66,7 @@ pub fn run() {
             let target = args
                 .iter()
                 .skip(1)
-                .filter(|arg| !arg.starts_with('-'))
-                .find(|arg| Path::new(arg).is_dir())
-                .cloned();
+                .find_map(|arg| path_arg(arg));
             if let Some(target) = target {
                 let _ = app.emit("oriel:open-path", target);
             }
@@ -70,7 +90,7 @@ pub fn run() {
             system::set_tray_visible,
             system::set_folder_handler,
             system::set_default_file_manager,
-            system::open_default_apps,
+            system::open_log_folder,
             system::restart_service,
             system::relaunch_elevated,
             system::take_startup_paths,

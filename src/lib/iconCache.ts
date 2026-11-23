@@ -136,3 +136,47 @@ export async function pruneCachedIcons(): Promise<void> {
     // Best effort only.
   }
 }
+
+export interface IconCacheStats {
+  count: number;
+  /** Approximate, measured from the length of the stored data URLs. */
+  bytes: number;
+}
+
+export async function iconCacheStats(): Promise<IconCacheStats> {
+  const db = await openDb();
+  if (!db) return { count: 0, bytes: 0 };
+
+  const stats: IconCacheStats = { count: 0, bytes: 0 };
+  try {
+    const transaction = db.transaction(STORE, "readonly");
+    const request = transaction.objectStore(STORE).openCursor();
+
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return;
+      const record = cursor.value as CachedShellIcon;
+      stats.count += 1;
+      stats.bytes += record.value?.length ?? 0;
+      cursor.continue();
+    };
+
+    await done(transaction);
+    return stats;
+  } catch {
+    return stats;
+  }
+}
+
+export async function clearCachedIcons(): Promise<void> {
+  const db = await openDb();
+  if (!db) return;
+
+  try {
+    const transaction = db.transaction(STORE, "readwrite");
+    transaction.objectStore(STORE).clear();
+    await done(transaction);
+  } catch {
+    // Nothing worth reporting: the cache only saves time.
+  }
+}

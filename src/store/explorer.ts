@@ -109,6 +109,8 @@ export interface ContextMenuState {
 
 export type Route = "files" | "home" | "settings" | "recycle" | "processes" | "ports" | "cleanup" | "uninstaller";
 export type StartLocation = "last" | "home" | "start";
+/** Optional list columns; the name column is always shown. */
+export type ListColumnKey = "date" | "size" | "kind";
 
 interface ClipboardState {
   mode: "copy" | "cut";
@@ -173,6 +175,21 @@ interface ExplorerState {
   ) => Promise<string | null>;
   showHidden: boolean;
   startLocation: StartLocation;
+  /** Show the 收藏 group in the sidebar. */
+  sidebarFavorites: boolean;
+  setSidebarFavorites: (value: boolean) => void;
+  /** A single click opens an entry instead of only selecting it. */
+  singleClickOpen: boolean;
+  setSingleClickOpen: (value: boolean) => void;
+  /** Ask before sending items to the recycle bin. */
+  confirmDelete: boolean;
+  setConfirmDelete: (value: boolean) => void;
+  /** Real thumbnails in the grid; off falls back to file-type icons. */
+  showThumbnails: boolean;
+  setShowThumbnails: (value: boolean) => void;
+  /** Which optional list columns are visible. */
+  listColumns: ListColumnKey[];
+  setListColumns: (value: ListColumnKey[]) => void;
   /** Finder-style preview panel on the right edge. */
   previewOpen: boolean;
   togglePreview: () => void;
@@ -514,6 +531,11 @@ const PREF = {
   sortDir: "oriel:pref-sort-dir",
   showHidden: "oriel:pref-show-hidden",
   startLocation: "oriel:pref-start-location",
+  sidebarFavorites: "oriel:pref-sidebar-favorites",
+  singleClickOpen: "oriel:pref-single-click-open",
+  confirmDelete: "oriel:pref-confirm-delete",
+  showThumbnails: "oriel:pref-show-thumbnails",
+  listColumns: "oriel:pref-list-columns",
   preview: "oriel:pref-preview",
   searchScope: "oriel:pref-search-scope",
   /** Marks the one-time widening from the old folder-only default. */
@@ -546,6 +568,21 @@ function readBoolean(key: string, fallback: boolean): boolean {
 
 function readLayout(): PaneLayout {
   return readString<PaneLayout>(PREF.layout, "1", ["1", "2", "3", "4"]);
+}
+
+const LIST_COLUMNS: ListColumnKey[] = ["date", "size", "kind"];
+
+function readListColumns(): ListColumnKey[] {
+  try {
+    const raw = localStorage.getItem(PREF.listColumns);
+    if (!raw) return [...LIST_COLUMNS];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [...LIST_COLUMNS];
+    const kept = LIST_COLUMNS.filter((key) => parsed.includes(key));
+    return kept.length > 0 ? kept : [...LIST_COLUMNS];
+  } catch {
+    return [...LIST_COLUMNS];
+  }
 }
 
 function writePreference(key: string, value: string | boolean): void {
@@ -825,6 +862,11 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
   pendingScrollTop: null,
   showHidden: readBoolean(PREF.showHidden, false),
   startLocation: readString(PREF.startLocation, "last", ["last", "home", "start"]),
+  sidebarFavorites: readBoolean(PREF.sidebarFavorites, true),
+  singleClickOpen: readBoolean(PREF.singleClickOpen, false),
+  confirmDelete: readBoolean(PREF.confirmDelete, true),
+  showThumbnails: readBoolean(PREF.showThumbnails, true),
+  listColumns: readListColumns(),
   previewOpen: readBoolean(PREF.preview, true),
 
   recycle: { items: [], total: 0, loading: false, skippedDrives: [] },
@@ -1183,6 +1225,32 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
     writePreference(PREF.startLocation, value);
   },
 
+  setSidebarFavorites(value) {
+    set({ sidebarFavorites: value });
+    writePreference(PREF.sidebarFavorites, value);
+  },
+
+  setSingleClickOpen(value) {
+    set({ singleClickOpen: value });
+    writePreference(PREF.singleClickOpen, value);
+  },
+
+  setConfirmDelete(value) {
+    set({ confirmDelete: value });
+    writePreference(PREF.confirmDelete, value);
+  },
+
+  setShowThumbnails(value) {
+    set({ showThumbnails: value });
+    writePreference(PREF.showThumbnails, value);
+  },
+
+  setListColumns(value) {
+    const next = LIST_COLUMNS.filter((key) => value.includes(key));
+    set({ listColumns: next });
+    writePreference(PREF.listColumns, JSON.stringify(next));
+  },
+
   resetPreferences() {
     set({
       view: "grid",
@@ -1191,6 +1259,11 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
       showHidden: false,
       startLocation: "last",
       groupKey: "none",
+      sidebarFavorites: true,
+      singleClickOpen: false,
+      confirmDelete: true,
+      showThumbnails: true,
+      listColumns: [...LIST_COLUMNS],
     });
     writePreference(PREF.view, "grid");
     writePreference(PREF.group, "none");
@@ -1198,6 +1271,11 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
     writePreference(PREF.sortDir, "asc");
     writePreference(PREF.showHidden, false);
     writePreference(PREF.startLocation, "last");
+    writePreference(PREF.sidebarFavorites, true);
+    writePreference(PREF.singleClickOpen, false);
+    writePreference(PREF.confirmDelete, true);
+    writePreference(PREF.showThumbnails, true);
+    writePreference(PREF.listColumns, JSON.stringify(LIST_COLUMNS));
     get().resetAppearance();
     if (get().route === "files") get().reload();
     get().notify("已恢复默认设置");
@@ -2212,9 +2290,10 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
       return;
     }
 
-    // Permanent deletion cannot be undone, so it always asks first.
-    if (permanent) {
-      set({ dialog: { kind: "confirm-remove", paths: [...paths], permanent: true } });
+    // Permanent deletion cannot be undone, and the recycle bin still deserves
+    // a second look when the user asked for one.
+    if (permanent || get().confirmDelete) {
+      set({ dialog: { kind: "confirm-remove", paths: [...paths], permanent } });
       return;
     }
 

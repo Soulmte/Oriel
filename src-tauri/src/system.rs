@@ -286,7 +286,7 @@ pub fn get_shell_prefs(app: AppHandle) -> ShellPrefsDto {
         close_to_tray: prefs.close_to_tray,
         autostart: get_autostart().enabled,
         folder_handler: registry_key_exists(r"HKCU\Software\Classes\Directory\shell\Oriel"),
-        default_handler: registry_key_exists(r"HKCU\Software\Classes\Oriel.Folder"),
+        default_handler: default_handler_installed(),
     }
 }
 
@@ -531,28 +531,59 @@ pub fn set_folder_handler(enabled: bool) -> Result<bool, String> {
 }
 
 #[tauri::command]
-pub fn open_default_apps() {
+pub fn open_log_folder() -> Result<(), String> {
+    let dir = std::env::temp_dir();
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        // Windows 11 jumps straight to Oriel's own page; Windows 10 ignores the
-        // query and lands on the general Default apps list.
-        let _ = Command::new("cmd")
-            .args([
-                "/C",
-                "start",
-                "",
-                "ms-settings:defaultapps?registeredAppUser=Oriel",
-            ])
+        Command::new("explorer")
+            .arg(&dir)
             .creation_flags(CREATE_NO_WINDOW)
-            .spawn();
+            .spawn()
+            .map_err(|error| error.to_string())?;
+        return Ok(());
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = dir;
+        Err("仅支持 Windows".into())
     }
 }
 
-/// Registers Oriel as a supported handler for folders and drives, then opens
-/// the Default apps page where Windows lets the user pick it. Windows does not
-/// expose an API that silently replaces Explorer, and hijacking
-/// `Winlogon\Shell` would take the desktop and taskbar with it.
+/// `Directory\shell\open` is the verb `ShellExecute` uses for real folders,
+/// so pointing it at Oriel redirects "open this folder" calls made by other
+/// programs. Explorer's own windows and Win+E navigate internally and stay with
+/// Explorer: Windows has no API to replace the shell itself.
+const DIRECTORY_OPEN_KEY: &str = r"HKCU\Software\Classes\Directory\shell\open\command";
+const DRIVE_OPEN_KEY: &str = r"HKCU\Software\Classes\Drive\shell\open\command";
+
+fn registry_default_value(key: &str) -> Option<String> {
+    let output = reg(&["query", key, "/ve"]).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    text.lines()
+        .find(|line| line.contains("REG_SZ"))
+        .and_then(|line| line.split("REG_SZ").nth(1))
+        .map(|value| value.trim().to_string())
+}
+
+fn default_handler_installed() -> bool {
+    let Some(name) = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.file_name().map(|name| name.to_string_lossy().to_lowercase()))
+    else {
+        return false;
+    };
+    registry_default_value(DIRECTORY_OPEN_KEY)
+        .map(|value| value.to_lowercase().contains(&name))
+        .unwrap_or(false)
+}
+
+/// Redirects the shell's folder-open verb to Oriel and registers it in the
+/// "打开方式" list. Reverting deletes the per-user override, so folders fall
+/// back to Explorer again.
 #[tauri::command]
 pub fn set_default_file_manager(enabled: bool) -> Result<bool, String> {
     let exe = current_exe_quoted();
@@ -560,6 +591,8 @@ pub fn set_default_file_manager(enabled: bool) -> Result<bool, String> {
 
     if !enabled {
         for key in [
+            r"HKCU\Software\Classes\Directory\shell\open",
+            r"HKCU\Software\Classes\Drive\shell\open",
             prog_id,
             r"HKCU\Software\Classes\Directory\OpenWithProgids\Oriel.Folder",
             r"HKCU\Software\Classes\Drive\OpenWithProgids\Oriel.Folder",
@@ -568,6 +601,25 @@ pub fn set_default_file_manager(enabled: bool) -> Result<bool, String> {
             let _ = reg(&["delete", key, "/f"]).status();
         }
         return Ok(false);
+    }
+
+    for (index, key) in [DIRECTORY_OPEN_KEY, DRIVE_OPEN_KEY].iter().enumerate() {
+        let status = reg(&[
+            "add",
+            key,
+            "/ve",
+            "/t",
+            "REG_SZ",
+            "/d",
+            &format!("{exe} \"%1\""),
+            "/f",
+        ])
+        .status();
+        let ok = status.map(|status| status.success()).unwrap_or(false);
+        // The folder key is what actually takes over; the drive one is a bonus.
+        if index == 0 && !ok {
+            return Err("无法写入文件夹关联".into());
+        }
     }
 
     // (key, value name — None means the key's default value, data)

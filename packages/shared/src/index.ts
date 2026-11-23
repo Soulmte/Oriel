@@ -4,9 +4,13 @@
  */
 
 export const APP_NAME = "Oriel";
-export const APP_VERSION = "0.1.5";
+export const APP_VERSION = "0.1.7";
 export const DEFAULT_API_PORT = 8787;
 export const DEFAULT_API_BASE_URL = `http://127.0.0.1:${DEFAULT_API_PORT}`;
+
+/** Public project pages, linked from Settings → About. */
+export const GITHUB_URL = "https://github.com/Soulmte/Oriel";
+export const GITEE_URL = "https://gitee.com/rain-drops/oriel";
 
 export type EntryKind = "file" | "directory";
 export type ViewMode = "grid" | "list";

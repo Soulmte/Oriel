@@ -63,11 +63,14 @@ export function SettingsSwitch({
   selected,
   onChange,
   disabled,
+  animate = true,
 }: {
   label: string;
   selected: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
+  /** Turn off while the real value is still loading, so it never slides in. */
+  animate?: boolean;
 }) {
   return (
     <button
@@ -84,6 +87,8 @@ export function SettingsSwitch({
           ? "bg-mac-blue"
           : "bg-black/[0.16] data-[hovered=true]:bg-black/[0.22] dark:bg-white/[0.24]",
         disabled && "cursor-default opacity-45",
+        !animate && "[&_*]:duration-0",
+        !animate && "duration-0",
       )}
     >
       <span

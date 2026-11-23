@@ -3,8 +3,6 @@ import type { ComponentType } from "react";
 import type { SFIconProps } from "sf-symbols-lib/dualtone";
 import {
   SFAppGrid,
-  SFChevronLeft,
-  SFChevronRight,
   SFCpu,
   SFDesktopcomputer,
   SFExternaldriveFill,
@@ -16,6 +14,8 @@ import {
   SFMusicNote,
   SFNetwork,
   SFPhotoFill,
+  SFSidebarLeft,
+  SFSidebarRight,
   SFSparkles,
   SFTrashFill,
   SFXmarkBinFill,
@@ -154,6 +154,7 @@ export function Sidebar() {
   const layout = useExplorer((state) => state.layout);
   const paneActivePath = useExplorer((state) => state.paneActivePath);
   const specials = useExplorer((state) => state.specials);
+  const sidebarFavorites = useExplorer((state) => state.sidebarFavorites);
   const drives = useExplorer((state) => state.drives);
   const platform = useExplorer((state) => state.system?.platform ?? "win32");
   const go = useExplorer((state) => state.go);
@@ -299,7 +300,7 @@ export function Sidebar() {
           title={collapsed ? "展开边栏" : "收起边栏"}
           className="grid size-6 place-items-center rounded-[5px] text-mac-muted outline-none transition-colors hover:bg-black/[0.06] hover:text-mac-text focus-visible:ring-2 focus-visible:ring-mac-blue/60 dark:hover:bg-white/[0.09]"
         >
-          {collapsed ? <SFChevronRight size={11} /> : <SFChevronLeft size={11} />}
+          {collapsed ? <SFSidebarRight size={13} /> : <SFSidebarLeft size={13} />}
         </button>
       </div>
 
@@ -315,31 +316,35 @@ export function Sidebar() {
           />
         </div>
 
-        {collapsed ? sectionSeparator : <p className={SECTION_CLASS}>收藏</p>}
-        <div className="flex flex-col gap-0.5">
-          {specials.map((folder) => {
-            const spec = SPECIAL_ICONS[folder.icon] ?? {
-              Icon: SFFolderFill,
-              tint: "text-[#3d9bff]",
-            };
-            const active =
-              route === "files" && samePath(displayPath, folder.path, platform);
-            return (
-              <SidebarItem
-                key={folder.id}
-                active={active}
-                label={folder.name}
-                title={folder.path}
-                dropPath={folder.path}
-                onSelect={() => go(folder.path)}
-                compact={collapsed}
-                icon={
-                  <spec.Icon size={16} className={clsx("shrink-0", spec.tint)} />
-                }
-              />
-            );
-          })}
-        </div>
+        {sidebarFavorites && (
+          <>
+            {collapsed ? sectionSeparator : <p className={SECTION_CLASS}>收藏</p>}
+            <div className="flex flex-col gap-0.5">
+              {specials.map((folder) => {
+                const spec = SPECIAL_ICONS[folder.icon] ?? {
+                  Icon: SFFolderFill,
+                  tint: "text-[#3d9bff]",
+                };
+                const active =
+                  route === "files" && samePath(displayPath, folder.path, platform);
+                return (
+                  <SidebarItem
+                    key={folder.id}
+                    active={active}
+                    label={folder.name}
+                    title={folder.path}
+                    dropPath={folder.path}
+                    onSelect={() => go(folder.path)}
+                    compact={collapsed}
+                    icon={
+                      <spec.Icon size={16} className={clsx("shrink-0", spec.tint)} />
+                    }
+                  />
+                );
+              })}
+            </div>
+          </>
+        )}
 
         {collapsed ? sectionSeparator : <p className={SECTION_CLASS}>位置</p>}
         <div className="flex flex-col gap-0.5">

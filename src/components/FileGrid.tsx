@@ -44,7 +44,9 @@ function GridTile({
   const navigate = useExplorer((state) => state.navigate);
   const dropPaths = useExplorer((state) => state.dropPaths);
   const platform = useExplorer((state) => state.system?.platform ?? "win32");
-  const openOnClick = useDoubleClickOpen(() => void openEntry(entry));
+  const singleClickOpen = useExplorer((state) => state.singleClickOpen);
+  const showThumbnails = useExplorer((state) => state.showThumbnails);
+  const openOnClick = useDoubleClickOpen(() => void openEntry(entry), singleClickOpen);
 
   const drop = useDropTarget({
     enabled: entry.kind === "directory",
@@ -109,7 +111,9 @@ function GridTile({
           entry={entry}
           size={metrics.iconSize}
           shellIcon={shellIcon}
-          thumbnailUrl={thumbnailFor(entry, metrics.iconSize * 2)}
+          thumbnailUrl={
+            showThumbnails ? thumbnailFor(entry, metrics.iconSize * 2) : undefined
+          }
         />
         <span
           title={entry.name}

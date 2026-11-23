@@ -14,7 +14,7 @@ const OPEN_DEDUPE_MS = 350;
  * open". Remembering the previous click lets the second one open the entry even
  * when the browser never reports a double-click.
  */
-export function useDoubleClickOpen(open: () => void) {
+export function useDoubleClickOpen(open: () => void, singleClick = false) {
   const lastClick = useRef<{ path: string; at: number } | null>(null);
   const lastOpen = useRef(0);
 
@@ -50,6 +50,14 @@ export function useDoubleClickOpen(open: () => void) {
       }
 
       const now = Date.now();
+      // Web-style mode: the first press opens. Selection happened already in the
+      // click handler, so the row the user clicked is what gets opened.
+      if (singleClick) {
+        lastClick.current = null;
+        trigger();
+        return;
+      }
+
       const previous = lastClick.current;
       if (previous && previous.path === path && now - previous.at <= DOUBLE_CLICK_MS) {
         lastClick.current = null;
@@ -58,6 +66,6 @@ export function useDoubleClickOpen(open: () => void) {
       }
       lastClick.current = { path, at: now };
     },
-    [trigger],
+    [trigger, singleClick],
   );
 }

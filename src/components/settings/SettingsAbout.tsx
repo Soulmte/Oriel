@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@heroui/react";
-import { SFArrowCounterclockwise, SFChevronRight } from "sf-symbols-lib/dualtone";
-import { APP_VERSION } from "@oriel/shared";
+import {
+  SFArrowCounterclockwise,
+  SFChevronRight,
+  SFArrowUpRightSquare,
+} from "sf-symbols-lib/dualtone";
+import { APP_VERSION, GITHUB_URL, GITEE_URL } from "@oriel/shared";
 import type { UpdateInfoDto } from "@oriel/shared";
 import { useExplorer } from "../../store/explorer";
 import { useAppTheme } from "../ThemeProvider";
@@ -148,6 +152,30 @@ export function SettingsAbout() {
           <span className="text-[12px] tabular-nums text-mac-muted">
             v{APP_VERSION}
           </span>
+        </SettingsRow>
+      </SettingsSection>
+
+      <SettingsSection title="链接">
+        <SettingsRow title="GitHub" detail="源码、Issue 与完整更新日志">
+          <button
+            type="button"
+            onClick={() => void api.openPath(GITHUB_URL)}
+            className="flex h-7 items-center gap-1.5 rounded-[6px] bg-mac-surface px-2.5 text-[12px] text-mac-text shadow-[0_0_0_1px_var(--color-mac-line)] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.08]"
+          >
+            github.com/Soulmte/Oriel
+            <SFArrowUpRightSquare size={11} className="text-mac-muted" />
+          </button>
+        </SettingsRow>
+
+        <SettingsRow title="Gitee" detail="国内镜像，下载安装包更快">
+          <button
+            type="button"
+            onClick={() => void api.openPath(GITEE_URL)}
+            className="flex h-7 items-center gap-1.5 rounded-[6px] bg-mac-surface px-2.5 text-[12px] text-mac-text shadow-[0_0_0_1px_var(--color-mac-line)] transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.08]"
+          >
+            gitee.com/rain-drops/oriel
+            <SFArrowUpRightSquare size={11} className="text-mac-muted" />
+          </button>
         </SettingsRow>
       </SettingsSection>
 

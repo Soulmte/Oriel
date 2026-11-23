@@ -284,6 +284,12 @@ pub fn delete_to_recycle(paths_to_delete: &[String]) -> Result<u32> {
 }
 
 pub fn open_with_system(target: &str) -> Result<()> {
+    // `explorer.exe <url>` hands the link to the default browser. Passing it as
+    // a single argument avoids cmd parsing, so `&` in a URL stays harmless.
+    if target.starts_with("http://") || target.starts_with("https://") {
+        let _ = std::process::Command::new("explorer.exe").arg(target).spawn();
+        return Ok(());
+    }
     entry::stat(target)?;
     let _ = std::process::Command::new("explorer.exe").arg(target).spawn();
     Ok(())

@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
-import { SFArrowUpRightSquare, SFGearshapeFill, SFSidebarRight } from "sf-symbols-lib/dualtone";
+import { SFGearshapeFill } from "sf-symbols-lib/dualtone";
 import { useExplorer } from "../../store/explorer";
 import { isNativeShellAvailable } from "../../lib/shell";
+import { clearCachedIcons, iconCacheStats } from "../../lib/iconCache";
+import { formatBytes } from "../../lib/format";
 import {
-  openDefaultAppsSettings,
+  openLogFolder,
   readShellPrefs,
+  relaunchElevated,
   writeAutostart,
   writeCloseBehavior,
   writeDefaultHandler,
@@ -22,6 +25,8 @@ const TRAY_KEY = "oriel:pref-tray";
 const CLOSE_KEY = "oriel:pref-close-to-tray";
 const HANDLER_KEY = "oriel:pref-folder-handler";
 const DEFAULT_KEY = "oriel:pref-default-handler";
+/** Remembers the registry-backed values so the first paint is already right. */
+const AUTOSTART_KEY = "oriel:pref-autostart";
 
 function readFlag(key: string, fallback: boolean): boolean {
   try {
@@ -42,30 +47,44 @@ function writeFlag(key: string, value: boolean) {
 
 export function SettingsSystem() {
   const notify = useExplorer((state) => state.notify);
+  const confirmDelete = useExplorer((state) => state.confirmDelete);
+  const setConfirmDelete = useExplorer((state) => state.setConfirmDelete);
   const native = isNativeShellAvailable();
 
-  const [autostart, setAutostart] = useState(false);
+  const [autostart, setAutostart] = useState(() => readFlag(AUTOSTART_KEY, false));
   const [autostartBusy, setAutostartBusy] = useState(false);
   const [tray, setTray] = useState(() => readFlag(TRAY_KEY, true));
   const [closeToTray, setCloseToTray] = useState(() => readFlag(CLOSE_KEY, true));
   const [handler, setHandler] = useState(() => readFlag(HANDLER_KEY, false));
   const [defaultHandler, setDefaultHandler] = useState(() => readFlag(DEFAULT_KEY, false));
+  // Switches stay animation-free until the real values arrive, otherwise every
+  // visit to this page slides the autostart knob from off to on.
+  const [prefsReady, setPrefsReady] = useState(false);
+  const [cache, setCache] = useState<{ count: number; bytes: number } | null>(null);
+  const [cacheBusy, setCacheBusy] = useState(false);
 
   // Rust owns the real values (they must be known before the webview loads),
   // and the registry is the source of truth for autostart.
   useEffect(() => {
-    void readShellPrefs().then((prefs) => {
-      if (!prefs) return;
-      setAutostart(prefs.autostart);
-      setTray(prefs.tray);
-      setCloseToTray(prefs.closeToTray);
-      setHandler(prefs.folderHandler);
-      setDefaultHandler(prefs.defaultHandler);
-      writeFlag(TRAY_KEY, prefs.tray);
-      writeFlag(CLOSE_KEY, prefs.closeToTray);
-      writeFlag(HANDLER_KEY, prefs.folderHandler);
-      writeFlag(DEFAULT_KEY, prefs.defaultHandler);
-    });
+    void readShellPrefs()
+      .then((prefs) => {
+        if (!prefs) return;
+        setAutostart(prefs.autostart);
+        setTray(prefs.tray);
+        setCloseToTray(prefs.closeToTray);
+        setHandler(prefs.folderHandler);
+        setDefaultHandler(prefs.defaultHandler);
+        writeFlag(AUTOSTART_KEY, prefs.autostart);
+        writeFlag(TRAY_KEY, prefs.tray);
+        writeFlag(CLOSE_KEY, prefs.closeToTray);
+        writeFlag(HANDLER_KEY, prefs.folderHandler);
+        writeFlag(DEFAULT_KEY, prefs.defaultHandler);
+      })
+      .finally(() => setPrefsReady(true));
+  }, []);
+
+  useEffect(() => {
+    void iconCacheStats().then(setCache);
   }, []);
 
   const toggleAutostart = async (value: boolean) => {
@@ -77,7 +96,17 @@ export function SettingsSystem() {
       return;
     }
     setAutostart(value);
+    writeFlag(AUTOSTART_KEY, value);
     notify(value ? "已设置开机自启，登录后静默驻留托盘" : "已取消开机自启");
+  };
+
+  const clearCache = async () => {
+    setCacheBusy(true);
+    await clearCachedIcons();
+    setCache(await iconCacheStats());
+    setCacheBusy(false);
+    useExplorer.setState({ shellIcons: {} });
+    notify("已清理图标缓存");
   };
 
   return (
@@ -102,6 +131,7 @@ export function SettingsSystem() {
             label="开机自启"
             selected={autostart}
             disabled={!native || autostartBusy || !tray}
+            animate={prefsReady}
             onChange={(value) => void toggleAutostart(value)}
           />
         </SettingsRow>
@@ -114,13 +144,17 @@ export function SettingsSystem() {
             label="显示托盘图标"
             selected={tray}
             disabled={!native}
+            animate={prefsReady}
             onChange={(value) => {
               setTray(value);
               writeFlag(TRAY_KEY, value);
               void writeTrayVisible(value);
               // Without a tray icon there is no way back into a hidden window.
               if (!value && autostart) {
-                void writeAutostart(false).then(() => setAutostart(false));
+                void writeAutostart(false).then(() => {
+                  setAutostart(false);
+                  writeFlag(AUTOSTART_KEY, false);
+                });
                 notify("已隐藏托盘图标，并取消开机自启");
               } else {
                 notify(value ? "托盘图标已显示" : "托盘图标已隐藏");
@@ -137,6 +171,7 @@ export function SettingsSystem() {
             label="关闭时最小化到托盘"
             selected={closeToTray}
             disabled={!native || !tray}
+            animate={prefsReady}
             onChange={(value) => {
               setCloseToTray(value);
               writeFlag(CLOSE_KEY, value);
@@ -146,29 +181,29 @@ export function SettingsSystem() {
         </SettingsRow>
       </SettingsSection>
 
-      <SettingsSection title="替代资源管理器">
+      <SettingsSection title="资源管理器">
         <SettingsRow
           title="设为默认资源管理器"
-          detail="把 Oriel 注册为文件夹和磁盘的打开方式，然后在「默认应用」里确认。Windows 不允许程序静默顶替 Explorer，直接改 Winlogon\Shell 会连桌面和任务栏一起接管，这里用的是受支持的做法。"
+          detail="其它程序的「打开文件夹」会跳到 Oriel"
         >
           <SettingsSwitch
-            label="注册为默认打开方式"
+            label="设为默认资源管理器"
             selected={defaultHandler}
             disabled={!native}
+            animate={prefsReady}
             onChange={(value) => {
               void writeDefaultHandler(value).then((ok) => {
-                if (!ok && value) {
+                if (!ok) {
                   notify("未能写入注册表");
                   return;
                 }
                 setDefaultHandler(value);
                 writeFlag(DEFAULT_KEY, value);
-                if (value) {
-                  void openDefaultAppsSettings();
-                  notify("已注册，请在「默认应用」中选择 Oriel");
-                } else {
-                  notify("已取消默认打开方式");
-                }
+                notify(
+                  value
+                    ? "已设为默认，其它程序的「打开文件夹」会跳到 Oriel"
+                    : "已恢复用资源管理器打开文件夹",
+                );
               });
             }}
           />
@@ -176,12 +211,13 @@ export function SettingsSystem() {
 
         <SettingsRow
           title="在文件夹右键菜单中显示「用 Oriel 打开」"
-          detail="同时作用于文件夹、文件夹空白处和磁盘；不改动系统默认行为"
+          detail="作用于文件夹、文件夹空白处和磁盘"
         >
           <SettingsSwitch
             label="文件夹右键菜单"
             selected={handler}
             disabled={!native}
+            animate={prefsReady}
             onChange={(value) => {
               void writeFolderHandler(value).then((ok) => {
                 if (!ok) {
@@ -195,24 +231,69 @@ export function SettingsSystem() {
             }}
           />
         </SettingsRow>
+      </SettingsSection>
 
-        <SettingsRow title="打开 Windows 默认应用" detail="手动把 Oriel 设为文件夹的默认打开方式">
+      <SettingsSection title="文件操作">
+        <SettingsRow
+          title="删除前确认"
+          detail="删除多个项目或非空文件夹时先问一次；永久删除始终会确认"
+        >
+          <SettingsSwitch
+            label="删除前确认"
+            selected={confirmDelete}
+            onChange={setConfirmDelete}
+          />
+        </SettingsRow>
+      </SettingsSection>
+
+      <SettingsSection title="维护">
+        <SettingsRow
+          title="图标缓存"
+          detail={
+            cache
+              ? `${cache.count} 个图标 · ${formatBytes(cache.bytes)}`
+              : "正在统计…"
+          }
+        >
+          <button
+            type="button"
+            disabled={cacheBusy || (cache?.count ?? 0) === 0}
+            onClick={() => void clearCache()}
+            className="h-7 rounded-[6px] bg-mac-surface px-2.5 text-[12px] text-mac-text shadow-[0_0_0_1px_var(--color-mac-line)] transition-colors hover:bg-black/[0.04] disabled:opacity-45 dark:hover:bg-white/[0.08]"
+          >
+            清理
+          </button>
+        </SettingsRow>
+
+        <SettingsRow title="打开日志目录" detail="遇到问题时把 oriel-sidecar.log 发出来">
           <button
             type="button"
             disabled={!native}
-            onClick={() => void openDefaultAppsSettings()}
-            className="flex h-7 items-center gap-1.5 rounded-[6px] bg-mac-surface px-2.5 text-[12px] text-mac-text shadow-[0_0_0_1px_var(--color-mac-line)] transition-colors hover:bg-black/[0.04] disabled:opacity-45 dark:hover:bg-white/[0.08]"
+            onClick={() => void openLogFolder()}
+            className="h-7 rounded-[6px] bg-mac-surface px-2.5 text-[12px] text-mac-text shadow-[0_0_0_1px_var(--color-mac-line)] transition-colors hover:bg-black/[0.04] disabled:opacity-45 dark:hover:bg-white/[0.08]"
           >
-            <SFSidebarRight size={12} />
-            打开默认应用
-            <SFArrowUpRightSquare size={11} className="text-mac-muted" />
+            打开
+          </button>
+        </SettingsRow>
+
+        <SettingsRow
+          title="以管理员身份重启"
+          detail="处理系统级目录或卸载残留时需要更高权限"
+        >
+          <button
+            type="button"
+            disabled={!native}
+            onClick={() => void relaunchElevated()}
+            className="h-7 rounded-[6px] bg-mac-surface px-2.5 text-[12px] text-mac-text shadow-[0_0_0_1px_var(--color-mac-line)] transition-colors hover:bg-black/[0.04] disabled:opacity-45 dark:hover:bg-white/[0.08]"
+          >
+            重启并提权
           </button>
         </SettingsRow>
       </SettingsSection>
 
       <p className="mt-4 flex items-start gap-1.5 px-1 text-[11px] leading-4 text-mac-muted">
         <SFGearshapeFill size={11} className="mt-0.5 shrink-0" />
-        这些开关直接写 Windows 的注册表（HKCU，当前用户），不需要管理员权限；卸载时不会自动清理，可以在这里关掉。
+        注册表项写入当前用户（HKCU），不需要管理员权限；卸载时不会自动清理，可以在这里关掉。
       </p>
     </>
   );
