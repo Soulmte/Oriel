@@ -4,8 +4,6 @@
 //! Entries are stored (uncompressed), which Office reads happily and keeps the
 //! writer dependency-free.
 
-use std::process::Command;
-
 const XML_DECL: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
 
 fn crc32(data: &[u8]) -> u32 {
@@ -322,7 +320,7 @@ pub fn preview_text(path: &str, ext: &str) -> Option<(String, bool)> {
     };
 
     let tool = crate::archive::tool().ok()?;
-    let output = Command::new(tool)
+    let output = crate::archive::seven_zip(&tool)
         .args(["e", "-so", path, part])
         .output()
         .ok()?;

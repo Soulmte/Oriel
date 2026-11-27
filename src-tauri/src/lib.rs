@@ -112,6 +112,9 @@ pub fn run() {
 
             let handle = app.handle().clone();
             std::thread::spawn(move || system::ensure_service(&handle));
+            // Fix associations written by 0.1.8 (it put the empty DelegateExecute
+            // on the wrong key, so folders still opened in Explorer).
+            std::thread::spawn(system::repair_default_handler);
 
             if prefs.tray {
                 let tray = system::build_tray(app.handle())?;

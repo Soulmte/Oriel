@@ -13,6 +13,19 @@ use oriel_core::CoreError;
 
 const ARCHIVE_SCHEME: &str = "archive://";
 const SEPARATOR: char = '|';
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// 7-Zip is a console program. Without this flag every archive listing or
+/// Office preview flashes a terminal window over the file manager.
+pub(crate) fn seven_zip(tool: &std::path::Path) -> Command {
+    let mut command = Command::new(tool);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+}
 
 static SEVEN_ZIP: LazyLock<Mutex<Option<Option<PathBuf>>>> = LazyLock::new(|| Mutex::new(None));
 
@@ -27,7 +40,7 @@ fn find_tool() -> Option<PathBuf> {
             return Some(PathBuf::from(candidate));
         }
     }
-    if Command::new("7z.exe").arg("i").output().is_ok() {
+    if seven_zip(std::path::Path::new("7z.exe")).arg("i").output().is_ok() {
         return Some(PathBuf::from("7z.exe"));
     }
     if let Ok(paths) = std::env::var("PATH") {
@@ -198,7 +211,7 @@ fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
 
 fn list_raw(archive: &str) -> Result<Vec<RawEntry>, CoreError> {
     let tool = tool()?;
-    let output = Command::new(tool)
+    let output = seven_zip(&tool)
         .args(["l", "-slt", "-ba", archive])
         .output()
         .map_err(|error| CoreError::internal(error.to_string()))?;
@@ -322,7 +335,7 @@ pub fn stat(target: &str) -> Result<Entry, CoreError> {
 pub fn read_entry(target: &str, limit: u64) -> Result<(Vec<u8>, u64), CoreError> {
     let location = parse(target)?;
     let tool = tool()?;
-    let output = Command::new(tool)
+    let output = seven_zip(&tool)
         .args(["x", "-so", &location.archive, &location.inner])
         .output()
         .map_err(|error| CoreError::internal(error.to_string()))?;
@@ -341,7 +354,7 @@ pub fn extract(path: &str, target: &str, policy: &str) -> Result<Vec<String>, Co
         None => path.to_string(),
     };
     let tool = tool()?;
-    let mut command = Command::new(tool);
+    let mut command = seven_zip(&tool);
     command.arg("x").arg("-y").arg(format!("-o{target}"));
     match policy {
         "skip" => {
@@ -370,7 +383,7 @@ pub fn extract(path: &str, target: &str, policy: &str) -> Result<Vec<String>, Co
 pub fn create(sources: &[String], target: &str, name: &str) -> Result<String, CoreError> {
     let tool = tool()?;
     let destination = oriel_core::paths::join(target, name);
-    let mut command = Command::new(tool);
+    let mut command = seven_zip(&tool);
     command.arg("a").arg("-tzip").arg(&destination);
     for source in sources {
         command.arg(source);

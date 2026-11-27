@@ -283,21 +283,37 @@ pub fn delete_to_recycle(paths_to_delete: &[String]) -> Result<u32> {
     Ok(paths_to_delete.len() as u32)
 }
 
+/// Children of the service must never open a console window of their own;
+/// `explorer.exe` is a GUI process, but a console build of the service (dev)
+/// would otherwise flash one.
+fn hidden(mut command: std::process::Command) -> std::process::Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x0800_0000);
+    }
+    command
+}
+
 pub fn open_with_system(target: &str) -> Result<()> {
     // `explorer.exe <url>` hands the link to the default browser. Passing it as
     // a single argument avoids cmd parsing, so `&` in a URL stays harmless.
     if target.starts_with("http://") || target.starts_with("https://") {
-        let _ = std::process::Command::new("explorer.exe").arg(target).spawn();
+        let _ = hidden(std::process::Command::new("explorer.exe"))
+            .arg(target)
+            .spawn();
         return Ok(());
     }
     entry::stat(target)?;
-    let _ = std::process::Command::new("explorer.exe").arg(target).spawn();
+    let _ = hidden(std::process::Command::new("explorer.exe"))
+        .arg(target)
+        .spawn();
     Ok(())
 }
 
 pub fn reveal_in_system(target: &str) -> Result<()> {
     entry::stat(target)?;
-    let _ = std::process::Command::new("explorer.exe")
+    let _ = hidden(std::process::Command::new("explorer.exe"))
         .arg(format!("/select,{target}"))
         .spawn();
     Ok(())

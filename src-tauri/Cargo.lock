@@ -2617,7 +2617,7 @@ dependencies = [
 
 [[package]]
 name = "oriel"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "oriel-core",
  "oriel-service",
@@ -2631,7 +2631,7 @@ dependencies = [
 
 [[package]]
 name = "oriel-core"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "base64 0.22.1",
  "image",
@@ -2642,7 +2642,7 @@ dependencies = [
 
 [[package]]
 name = "oriel-service"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "axum",
  "futures-util",

@@ -4,7 +4,7 @@
  */
 
 export const APP_NAME = "Oriel";
-export const APP_VERSION = "0.1.8";
+export const APP_VERSION = "0.1.9";
 export const DEFAULT_API_PORT = 8787;
 export const DEFAULT_API_BASE_URL = `http://127.0.0.1:${DEFAULT_API_PORT}`;
 

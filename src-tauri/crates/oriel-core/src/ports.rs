@@ -374,7 +374,14 @@ pub fn kill(pid: u32, service_pid: u32) -> Result<()> {
         }
     }
 
-    let output = std::process::Command::new("taskkill")
+    let mut taskkill = std::process::Command::new("taskkill");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // Killing a port's process must not flash a console window.
+        taskkill.creation_flags(0x0800_0000);
+    }
+    let output = taskkill
         .args(["/PID", &pid.to_string(), "/T", "/F"])
         .output()
         .map_err(|error| CoreError::bad_request("KILL_FAILED", error.to_string()))?;

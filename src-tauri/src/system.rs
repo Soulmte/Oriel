@@ -615,12 +615,32 @@ pub fn open_log_folder() -> Result<(), String> {
 const DIRECTORY_OPEN_KEY: &str = r"HKCU\Software\Classes\Directory\shell\open\command";
 const DRIVE_OPEN_KEY: &str = r"HKCU\Software\Classes\Drive\shell\open\command";
 /// The `Folder` class is what the shell uses for the folder verbs it runs
-/// itself; an empty `DelegateExecute` makes it execute the command line instead
-/// of its built-in handler.
+/// itself. Windows ships those verbs with a `DelegateExecute` CLSID on the
+/// `command` key, so the command line is only honoured once that value is
+/// cleared there.
 const FOLDER_VERB_KEYS: [&str; 2] = [
     r"HKCU\Software\Classes\Folder\shell\open",
     r"HKCU\Software\Classes\Folder\shell\explore",
 ];
+
+/// Explorer's built-in folder verbs delegate through a COM CLSID stored on
+/// `<verb>\command`. An empty `DelegateExecute` at that same key makes the shell
+/// run the plain command line instead; the value on the verb key itself is
+/// ignored. This is what makes the override visible to `ShellExecute`.
+fn clear_delegate(command_key: &str) {
+    let _ = reg(&[
+        "add",
+        command_key,
+        "/v",
+        "DelegateExecute",
+        "/t",
+        "REG_SZ",
+        "/d",
+        "",
+        "/f",
+    ])
+    .status();
+}
 
 fn registry_default_value(key: &str) -> Option<String> {
     let output = reg(&["query", key, "/ve"]).output().ok()?;
@@ -658,6 +678,16 @@ fn default_handler_installed() -> bool {
     registry_default_value(DIRECTORY_OPEN_KEY)
         .map(|value| value.to_lowercase().contains(&name))
         .unwrap_or(false)
+}
+
+/// Re-applies the folder association when it is already ours. Older builds put
+/// the empty `DelegateExecute` on the verb key instead of the command key, so
+/// the switch looked on while `ShellExecute` still opened Explorer; running this
+/// once per launch repairs that (and a stale exe path after an update).
+pub fn repair_default_handler() {
+    if default_handler_installed() {
+        let _ = set_default_file_manager(true);
+    }
 }
 
 /// Redirects the shell's folder-open verb to Oriel and registers it in the
@@ -704,14 +734,18 @@ pub fn set_default_file_manager(enabled: bool) -> Result<bool, String> {
         if index == 0 && (!ok || !default_handler_installed()) {
             return Err("无法写入文件夹关联，请确认安全软件没有拦截注册表写入".into());
         }
+        clear_delegate(key);
     }
 
-    // The shell's own folder verbs: blank DelegateExecute hands the command
-    // line to us instead of the stock handler.
+    // The shell's own folder verbs: drop the stock delegate and point the
+    // command line at Oriel.
     for key in FOLDER_VERB_KEYS {
+        // 0.1.8 wrote the empty value one level too high; remove that stale one.
+        let _ = reg(&["delete", key, "/v", "DelegateExecute", "/f"]).status();
+        let command = format!("{key}\\command");
         let _ = reg(&[
             "add",
-            &format!("{key}\\command"),
+            &command,
             "/ve",
             "/t",
             "REG_SZ",
@@ -720,18 +754,7 @@ pub fn set_default_file_manager(enabled: bool) -> Result<bool, String> {
             "/f",
         ])
         .status();
-        let _ = reg(&[
-            "add",
-            key,
-            "/v",
-            "DelegateExecute",
-            "/t",
-            "REG_SZ",
-            "/d",
-            "",
-            "/f",
-        ])
-        .status();
+        clear_delegate(&command);
     }
 
     // (key, value name — None means the key's default value, data)
