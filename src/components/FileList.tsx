@@ -14,6 +14,7 @@ import {
   displayName,
   fileKindLabel,
   formatBytes,
+  formatAgo,
   formatDate,
   sortEntriesCached,
   startsWithPath,
@@ -23,11 +24,18 @@ import { isArchivePath } from "../lib/archivePath";
 import { dragKind, getDraggedPaths, setDragPayload } from "../lib/dnd";
 import { FileIcon } from "../lib/fileIcons";
 
-const COLUMNS: Array<{ key: SortKey; label: string; className: string }> = [
-  { key: "name", label: "名称", className: "" },
-  { key: "date", label: "修改日期", className: "" },
-  { key: "size", label: "大小", className: "text-right" },
-  { key: "kind", label: "种类", className: "" },
+const COLUMNS: Array<{
+  key: "name" | "date" | "ago" | "size" | "kind";
+  label: string;
+  className: string;
+  /** Sorting"多久前" sorts by the date it is derived from. */
+  sort: SortKey;
+}> = [
+  { key: "name", label: "名称", className: "", sort: "name" },
+  { key: "ago", label: "多久前", className: "", sort: "date" },
+  { key: "date", label: "修改日期", className: "", sort: "date" },
+  { key: "size", label: "大小", className: "text-right", sort: "size" },
+  { key: "kind", label: "种类", className: "", sort: "kind" },
 ];
 
 const DEFAULT_ROW_HEIGHT = 28;
@@ -40,20 +48,23 @@ function columnsFor(
   visible: ListColumnKey[],
 ): {
   template: string;
+  ago: boolean;
   date: boolean;
   size: boolean;
   kind: boolean;
 } {
-  const date = width >= 440 && visible.includes("date");
+  const ago = width >= 520 && visible.includes("ago");
+  const date = width >= 700 && visible.includes("date");
   const size = visible.includes("size");
-  const kind = width >= 680 && visible.includes("kind");
+  const kind = width >= 860 && visible.includes("kind");
 
   const parts = ["minmax(150px, 1fr)"];
+  if (ago) parts.push("86px");
   if (date) parts.push("130px");
   if (size) parts.push("78px");
   if (kind) parts.push("minmax(70px, 110px)");
 
-  return { template: parts.join(" "), date, size, kind };
+  return { template: parts.join(" "), ago, date, size, kind };
 }
 
 /**
@@ -94,6 +105,7 @@ function ListRow({
   showExtensions,
   template,
   showDate,
+  showAgo,
   showSize,
   showKind,
   rowHeight,
@@ -103,6 +115,7 @@ function ListRow({
   showExtensions: boolean;
   template: string;
   showDate: boolean;
+  showAgo: boolean;
   showSize: boolean;
   showKind: boolean;
   rowHeight: number;
@@ -169,16 +182,31 @@ function ListRow({
         drop.active
           ? "bg-mac-blue/25 ring-1 ring-inset ring-mac-blue"
           : isSelected
-            ? "bg-mac-blue text-white"
+            ? "accent-fill text-white"
             : "hover:bg-black/[0.035] dark:hover:bg-white/[0.06]",
       )}
     >
       <div className="flex min-w-0 items-center gap-1.5 px-1">
-        <FileIcon entry={entry} size={18} shellIcon={shellIcon} />
+        <FileIcon
+          entry={entry}
+          size={18}
+          shellIcon={shellIcon}
+          selected={isSelected && !drop.active}
+        />
         <span className="truncate" title={entry.name}>
           {displayName(entry, showExtensions)}
         </span>
       </div>
+      {showAgo && (
+        <div
+          className={clsx(
+            "truncate px-1 tabular-nums",
+            isSelected && !drop.active ? "text-white/80" : "text-mac-muted",
+          )}
+        >
+          {formatAgo(entry.mtimeMs)}
+        </div>
+      )}
       {showDate && (
         <div
           className={clsx(
@@ -350,6 +378,7 @@ export function FileList({ entries }: { entries: EntryDto[] }) {
         {COLUMNS.filter(
           (column) =>
             column.key === "name" ||
+            (column.key === "ago" && columns.ago) ||
             (column.key === "date" && columns.date) ||
             (column.key === "size" && columns.size) ||
             (column.key === "kind" && columns.kind),
@@ -357,7 +386,7 @@ export function FileList({ entries }: { entries: EntryDto[] }) {
           <button
             key={column.key}
             type="button"
-            onClick={() => setSort(column.key)}
+            onClick={() => setSort(column.sort)}
             className={clsx(
               "flex items-center gap-1 px-1 text-left transition-colors hover:text-mac-text",
               column.className,
@@ -365,7 +394,7 @@ export function FileList({ entries }: { entries: EntryDto[] }) {
             )}
           >
             <span>{column.label}</span>
-            {sortKey === column.key &&
+            {sortKey === column.sort &&
               (sortDir === "asc" ? (
                 <ChevronUp className="size-3" />
               ) : (
@@ -422,6 +451,7 @@ export function FileList({ entries }: { entries: EntryDto[] }) {
                 showExtensions={showExtensions}
                 template={columns.template}
                 showDate={columns.date}
+                showAgo={columns.ago}
                 showSize={columns.size}
                 showKind={columns.kind}
                 rowHeight={ROW_HEIGHT}

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useExplorer } from "../store/explorer";
-import { ACCENTS, fontStackFor } from "../lib/appearance";
+import { ACCENTS, fontStackFor, hexToRgba } from "../lib/appearance";
 
 /**
  * Applies the presentation preferences to the document.
@@ -14,10 +14,26 @@ export function useAppearanceEffects(): void {
   useEffect(() => {
     const root = document.documentElement;
     const accent = ACCENTS[appearance.accent] ?? ACCENTS.blue;
+    // A custom colour wins over the preset swatch.
+    const color = appearance.customAccent || accent.color;
+    const soft = appearance.customAccent
+      ? hexToRgba(appearance.customAccent, 0.2)
+      : accent.soft;
 
-    root.style.setProperty("--color-mac-blue", accent.color);
-    root.style.setProperty("--color-mac-blue-soft", accent.soft);
-  }, [appearance.accent]);
+    root.style.setProperty("--color-mac-blue", color);
+    root.style.setProperty("--color-mac-blue-soft", soft);
+    // Folder icons follow the accent instead of a fixed Finder blue.
+    root.style.setProperty("--folder-tint", color);
+    root.style.setProperty("--folder-tint-soft", hexToRgba(color, 0.16));
+    // Filled surfaces (selection, primary buttons, progress bars) use this; a
+    // solid accent leaves it as `none` and the background colour shows.
+    root.style.setProperty(
+      "--accent-gradient",
+      appearance.accentTo
+        ? `linear-gradient(135deg, ${color} 0%, ${appearance.accentTo} 100%)`
+        : "none",
+    );
+  }, [appearance.accent, appearance.customAccent, appearance.accentTo]);
 
   useEffect(() => {
     // Chromium implements `zoom` on the root element, which scales layout and

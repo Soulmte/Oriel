@@ -76,7 +76,7 @@ function ExplorerShell() {
       <TitleBar />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <main className="flex min-w-0 flex-1 flex-col bg-mac-surface">
+        <main className="relative flex min-w-0 flex-1 flex-col bg-mac-surface">
           {route === "home" ? (
             <HomePage />
           ) : route === "settings" ? (

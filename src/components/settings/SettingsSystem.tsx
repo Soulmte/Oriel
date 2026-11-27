@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { SFGearshapeFill } from "sf-symbols-lib/dualtone";
 import { useExplorer } from "../../store/explorer";
 import { isNativeShellAvailable } from "../../lib/shell";
+import { errorMessage } from "../../lib/api";
 import { clearCachedIcons, iconCacheStats } from "../../lib/iconCache";
 import { formatBytes } from "../../lib/format";
 import {
@@ -192,19 +193,17 @@ export function SettingsSystem() {
             disabled={!native}
             animate={prefsReady}
             onChange={(value) => {
-              void writeDefaultHandler(value).then((ok) => {
-                if (!ok) {
-                  notify("未能写入注册表");
-                  return;
-                }
-                setDefaultHandler(value);
-                writeFlag(DEFAULT_KEY, value);
-                notify(
-                  value
-                    ? "已设为默认，其它程序的「打开文件夹」会跳到 Oriel"
-                    : "已恢复用资源管理器打开文件夹",
-                );
-              });
+              void writeDefaultHandler(value)
+                .then((active) => {
+                  setDefaultHandler(active);
+                  writeFlag(DEFAULT_KEY, active);
+                  notify(
+                    active
+                      ? "已设为默认，其它程序的「打开文件夹」会跳到 Oriel"
+                      : "已恢复用资源管理器打开文件夹",
+                  );
+                })
+                .catch((error) => notify(errorMessage(error)));
             }}
           />
         </SettingsRow>
@@ -219,15 +218,13 @@ export function SettingsSystem() {
             disabled={!native}
             animate={prefsReady}
             onChange={(value) => {
-              void writeFolderHandler(value).then((ok) => {
-                if (!ok) {
-                  notify("未能写入注册表");
-                  return;
-                }
-                setHandler(value);
-                writeFlag(HANDLER_KEY, value);
-                notify(value ? "已加入右键菜单" : "已从右键菜单移除");
-              });
+              void writeFolderHandler(value)
+                .then((active) => {
+                  setHandler(active);
+                  writeFlag(HANDLER_KEY, active);
+                  notify(active ? "已加入右键菜单" : "已从右键菜单移除");
+                })
+                .catch((error) => notify(errorMessage(error)));
             }}
           />
         </SettingsRow>

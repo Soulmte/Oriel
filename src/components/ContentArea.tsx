@@ -63,6 +63,7 @@ export function ContentArea() {
   const searchTruncated = useExplorer((state) => state.searchTruncated);
   const searchScanned = useExplorer((state) => state.searchScanned);
   const searchTimedOut = useExplorer((state) => state.searchTimedOut);
+  const stopSearch = useExplorer((state) => state.stopSearch);
   const reload = useExplorer((state) => state.reload);
   const path = useExplorer((state) => state.path);
   const dragging = useExplorer((state) => state.dragging);
@@ -108,8 +109,15 @@ export function ContentArea() {
           <div className="flex flex-col items-center gap-2 text-[12px] tabular-nums text-mac-muted">
             <Spinner size="sm" />
             <span>
-              正在搜索{searchScanned > 0 ? `，已扫描 ${searchScanned} 项` : "…"}
+              正在搜索{searchScanned > 0 ? `，已扫描 ${searchScanned.toLocaleString()} 项` : "…"}
             </span>
+            <button
+              type="button"
+              onClick={stopSearch}
+              className="rounded-[5px] px-2 py-0.5 text-[11.5px] text-mac-muted transition-colors hover:bg-black/[0.05] hover:text-mac-text dark:hover:bg-white/[0.08]"
+            >
+              停止
+            </button>
           </div>
         </div>
       );
@@ -129,7 +137,11 @@ export function ContentArea() {
           <CenteredState
             icon={<SFMagnifyingglass size={24} />}
             title={`找不到 “${query.trim()}”`}
-            detail={`已扫描 ${searchScanned.toLocaleString()} 项。请尝试其他关键词，或换一个文件夹再搜索。`}
+            detail={
+              searchTimedOut
+                ? `已扫描 ${searchScanned.toLocaleString()} 项后超时，结果可能不完整。可以把搜索范围切到「当前文件夹」，或换个关键词再试。`
+                : `已扫描 ${searchScanned.toLocaleString()} 项。请尝试其他关键词，或换一个文件夹再搜索。`
+            }
           />
         </div>
       );
@@ -140,7 +152,18 @@ export function ContentArea() {
         <div className="flex h-7 items-center gap-2 border-b border-mac-line px-3 text-[11px] text-mac-muted">
           <span className="tabular-nums">{results.length} 个搜索结果</span>
           {searching && (
-            <span className="tabular-nums">· 搜索中，已扫描 {searchScanned} 项</span>
+            <>
+              <span className="tabular-nums">
+                · 搜索中，已扫描 {searchScanned.toLocaleString()} 项
+              </span>
+              <button
+                type="button"
+                onClick={stopSearch}
+                className="rounded-[4px] px-1.5 py-0.5 transition-colors hover:bg-black/[0.05] hover:text-mac-text dark:hover:bg-white/[0.08]"
+              >
+                停止
+              </button>
+            </>
           )}
           {!searching && searchTruncated && (
             <span className="text-[#ff9f0a]">

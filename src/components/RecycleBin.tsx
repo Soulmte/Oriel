@@ -384,7 +384,7 @@ export function RecycleBin() {
                   </span>
                   <span className="flex min-w-0 items-center gap-1.5 px-1">
                     {item.kind === "directory" ? (
-                      <SFFolderFill size={16} className="shrink-0 text-[#3d9bff]" />
+                      <SFFolderFill size={16} className="shrink-0 text-[var(--folder-tint)]" />
                     ) : (
                       <SFDocumentFill size={16} className="shrink-0 text-[#98989f]" />
                     )}

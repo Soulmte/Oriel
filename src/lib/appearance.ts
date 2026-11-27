@@ -14,6 +14,10 @@ export type FontFamilyKey = "system" | "serif" | "mono" | "custom";
 export interface AppearancePrefs {
   accent: AccentKey;
   scale: UiScale;
+  /** Hex chosen from the colour picker; overrides `accent` when set. */
+  customAccent: string;
+  /** Second stop of an accent gradient; empty means a solid accent. */
+  accentTo: string;
   /** Disable transitions and animations (accessibility / low-end machines). */
   reduceMotion: boolean;
   gridSize: GridSize;
@@ -31,6 +35,8 @@ export const APPEARANCE_STORAGE_KEY = "oriel:pref-appearance";
 export const DEFAULT_APPEARANCE: AppearancePrefs = {
   accent: "blue",
   scale: "100",
+  customAccent: "",
+  accentTo: "",
   reduceMotion: false,
   gridSize: "md",
   showExtensions: true,
@@ -98,6 +104,79 @@ export const ACCENTS: Record<
   graphite: { label: "石墨", color: "#8e8e93", soft: "rgba(142, 142, 147, 0.22)", strong: "#6f6f74" },
 };
 
+/** `#0a84ff` → `rgba(10, 132, 255, alpha)`; used for the soft tints. */
+export function hexToRgba(hex: string, alpha: number): string {
+  const value = hex.replace("#", "");
+  if (!/^[0-9a-f]{6}$/i.test(value)) return `rgba(10, 132, 255, ${alpha})`;
+  const red = Number.parseInt(value.slice(0, 2), 16);
+  const green = Number.parseInt(value.slice(2, 4), 16);
+  const blue = Number.parseInt(value.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+/** Curated solid colours for the accent picker. */
+export const ACCENT_SWATCHES: string[] = [
+  "#0a84ff",
+  "#4f7cff",
+  "#7d5cff",
+  "#b45cff",
+  "#ff3d7f",
+  "#ff5a5f",
+  "#ff7a45",
+  "#ff9f0a",
+  "#ffc107",
+  "#30c85a",
+  "#2ec4a6",
+  "#14b8a6",
+  "#00b8d4",
+  "#0ea5e9",
+  "#64748b",
+  "#8e8e93",
+];
+
+/** Two-stop accents; the first stop becomes the UI colour, the second only the gradient. */
+export const ACCENT_GRADIENTS: Array<{ label: string; from: string; to: string }> = [
+  { label: "极光", from: "#0a84ff", to: "#7d5cff" },
+  { label: "日落", from: "#ff7a45", to: "#ff3d7f" },
+  { label: "薄荷", from: "#30c85a", to: "#0ea5e9" },
+  { label: "霓虹", from: "#b45cff", to: "#ff9f0a" },
+];
+
+/** `hsl` → `#rrggbb`, for the hue slider. */
+export function hslToHex(hue: number, saturation: number, lightness: number): string {
+  const s = saturation / 100;
+  const l = lightness / 100;
+  const k = (n: number) => (n + hue / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) =>
+    Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)))));
+  return `#${[f(0), f(8), f(4)]
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+/** Hue + lightness of a hex colour, for seeding the slider. */
+export function hexToHsl(hex: string): { hue: number; lightness: number } {
+  const value = hex.replace("#", "");
+  if (!/^[0-9a-f]{6}$/i.test(value)) return { hue: 211, lightness: 52 };
+  const r = Number.parseInt(value.slice(0, 2), 16) / 255;
+  const g = Number.parseInt(value.slice(2, 4), 16) / 255;
+  const b = Number.parseInt(value.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  let hue = 0;
+  if (delta !== 0) {
+    if (max === r) hue = ((g - b) / delta) % 6;
+    else if (max === g) hue = (b - r) / delta + 2;
+    else hue = (r - g) / delta + 4;
+  }
+  hue = Math.round(hue * 60);
+  if (hue < 0) hue += 360;
+  const lightness = Math.round(((max + min) / 2) * 100);
+  return { hue, lightness };
+}
+
 export const SCALES: Array<{ value: UiScale; label: string }> = [
   { value: "90", label: "90%" },
   { value: "100", label: "100%" },
@@ -157,6 +236,14 @@ export function readAppearance(): AppearancePrefs {
     return {
       accent,
       scale,
+      customAccent:
+        typeof parsed.customAccent === "string" && /^#[0-9a-f]{6}$/i.test(parsed.customAccent)
+          ? parsed.customAccent
+          : "",
+      accentTo:
+        typeof parsed.accentTo === "string" && /^#[0-9a-f]{6}$/i.test(parsed.accentTo)
+          ? parsed.accentTo
+          : "",
       gridSize,
       density,
       glass,

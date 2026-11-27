@@ -326,7 +326,7 @@ export function SettingsAbout() {
 
                 {download?.status === "done" && (
                   <p className="text-[11px] leading-4 text-mac-muted">
-                    「立即安装」会先退出 Oriel 再启动安装程序；安装完成后请重新打开。
+                    「立即安装」会退出 Oriel 并在后台静默安装，不会弹出卸载/安装向导；装完重新打开即可。
                   </p>
                 )}
               </div>

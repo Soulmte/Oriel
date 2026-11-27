@@ -19,6 +19,25 @@ function pad(value: number): string {
   return value.toString().padStart(2, "0");
 }
 
+/**
+ * Coarse "how long ago" label for the list column. Chinese has no plural
+ * forms, so plain numbers are fine; anything under a minute reads“刚刚”.
+ */
+export function formatAgo(ms: number, now = Date.now()): string {
+  if (!ms) return "—";
+  const diff = Math.max(0, now - ms);
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (diff < minute) return "刚刚";
+  if (diff < hour) return `${Math.floor(diff / minute)} 分钟前`;
+  if (diff < day) return `${Math.floor(diff / hour)} 小时前`;
+  if (diff < 30 * day) return `${Math.floor(diff / day)} 天前`;
+  if (diff < 365 * day) return `${Math.floor(diff / (30 * day))} 个月前`;
+  return `${Math.floor(diff / (365 * day))} 年前`;
+}
+
 export function formatDate(ms: number): string {
   if (!ms) return "—";
   const date = new Date(ms);

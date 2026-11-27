@@ -62,13 +62,13 @@ export async function writeCloseBehavior(minimize: boolean): Promise<void> {
 
 /** Adds/removes "用 Oriel 打开" on folders, folders' background and drives. */
 export async function writeFolderHandler(enabled: boolean): Promise<boolean> {
-  if (!isNativeShellAvailable()) return false;
+  if (!isNativeShellAvailable()) return enabled;
   return invoke<boolean>("set_folder_handler", { enabled });
 }
 
 /** Takes over the shell's folder-open verb for the current user. */
 export async function writeDefaultHandler(enabled: boolean): Promise<boolean> {
-  if (!isNativeShellAvailable()) return false;
+  if (!isNativeShellAvailable()) return enabled;
   return invoke<boolean>("set_default_file_manager", { enabled });
 }
 

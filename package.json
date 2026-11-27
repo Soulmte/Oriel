@@ -1,6 +1,6 @@
 {
   "name": "oriel",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "private": true,
   "type": "module",
   "description": "A Finder-style file manager for Windows — Tauri 2 + React 19 + native Rust service",

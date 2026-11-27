@@ -152,7 +152,10 @@ pub fn file_info(target: &str) -> Result<FileInfo> {
 
 /// Reads just enough of the header to report pixel dimensions.
 fn image_size(target: &str, ext: &str) -> Option<ImageInfo> {
-    if !matches!(ext, "png" | "jpg" | "jpeg" | "gif" | "bmp" | "webp") {
+    if !matches!(
+        ext,
+        "png" | "jpg" | "jpeg" | "gif" | "bmp" | "webp" | "tif" | "tiff"
+    ) {
         return None;
     }
     let mut file = File::open(target).ok()?;
@@ -188,7 +191,15 @@ fn image_size(target: &str, ext: &str) -> Option<ImageInfo> {
         });
     }
 
-    None
+    // WebP/TIFF/BMP have no hand-written parser here; the `image` crate reads
+    // only the header, so this stays cheap even for large files.
+    image::image_dimensions(target)
+        .ok()
+        .map(|(width, height)| ImageInfo {
+            width,
+            height,
+            format: Some(ext.to_string()),
+        })
 }
 
 fn jpeg_size(target: &str) -> Option<(u32, u32)> {

@@ -4,6 +4,8 @@
 //! Entries are stored (uncompressed), which Office reads happily and keeps the
 //! writer dependency-free.
 
+use std::process::Command;
+
 const XML_DECL: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>";
 
 fn crc32(data: &[u8]) -> u32 {
@@ -300,5 +302,130 @@ pub fn build(template: &str) -> Option<Vec<u8>> {
         "xlsx" => Some(build_xlsx()),
         "pptx" => Some(build_pptx()),
         _ => None,
+    }
+}
+
+/// Characters the preview panel accepts from an extracted document.
+const TEXT_CHAR_LIMIT: usize = 200_000;
+
+/// Extracts the visible text of an Office Open XML document.
+///
+/// Word and PowerPoint files are zip packages, so 7-Zip streams the parts that
+/// hold the text and the tags are stripped here. Formatting, images and tables
+/// are lost on purpose: the preview panel only needs something readable, and a
+/// missing 7-Zip just means the panel falls back to the file icon.
+pub fn preview_text(path: &str, ext: &str) -> Option<(String, bool)> {
+    let (part, paragraph) = match ext {
+        "docx" | "docm" | "dotx" | "dotm" => ("word/document.xml", "</w:p>"),
+        "pptx" | "pptm" | "ppsx" | "potx" => ("ppt/slides/slide*.xml", "</a:p>"),
+        _ => return None,
+    };
+
+    let tool = crate::archive::tool().ok()?;
+    let output = Command::new(tool)
+        .args(["e", "-so", path, part])
+        .output()
+        .ok()?;
+    if !output.status.success() || output.stdout.is_empty() {
+        return None;
+    }
+
+    let raw = String::from_utf8_lossy(&output.stdout);
+    let text = xml_to_text(&raw, paragraph);
+    if text.trim().is_empty() {
+        return None;
+    }
+
+    let truncated = text.chars().count() > TEXT_CHAR_LIMIT;
+    Some((text.chars().take(TEXT_CHAR_LIMIT).collect(), truncated))
+}
+
+/// Turns a WordprocessingML / PresentationML part into plain text.
+fn xml_to_text(xml: &str, paragraph: &str) -> String {
+    let prepared = xml
+        .replace(paragraph, "\n")
+        .replace("<w:p/>", "\n")
+        .replace("<w:p />", "\n")
+        .replace("<a:p/>", "\n")
+        .replace("<a:p />", "\n")
+        .replace("<w:br/>", "\n")
+        .replace("<w:br />", "\n")
+        .replace("<w:tab/>", "\t")
+        .replace("<w:tab />", "\t")
+        .replace("<a:br/>", "\n")
+        .replace("<a:br />", "\n");
+
+    let mut out = String::with_capacity(prepared.len() / 2);
+    let mut depth = 0u32;
+    for ch in prepared.chars() {
+        match ch {
+            '<' => depth += 1,
+            '>' => depth = depth.saturating_sub(1),
+            _ if depth == 0 => out.push(ch),
+            _ => {}
+        }
+    }
+
+    let decoded = out
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&");
+
+    // Word emits one empty paragraph for every visual gap; keep at most one.
+    let mut cleaned = String::with_capacity(decoded.len());
+    let mut blanks = 0usize;
+    for line in decoded.lines() {
+        let line = line.trim_end();
+        if line.trim().is_empty() {
+            blanks += 1;
+            if blanks > 1 {
+                continue;
+            }
+            cleaned.push('\n');
+        } else {
+            blanks = 0;
+            cleaned.push_str(line);
+            cleaned.push('\n');
+        }
+    }
+    cleaned.trim().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn xml_to_text_keeps_paragraphs_and_decodes_entities() {
+        let xml = concat!(
+            "<?xml version=\"1.0\"?><w:document><w:body>",
+            "<w:p><w:r><w:t>Hello</w:t></w:r>",
+            "<w:r><w:t xml:space=\"preserve\"> world</w:t></w:r></w:p>",
+            "<w:p/><w:p><w:r><w:t>A &amp; B &lt;tag&gt;</w:t></w:r></w:p>",
+            "</w:body></w:document>"
+        );
+        assert_eq!(
+            xml_to_text(xml, "</w:p>"),
+            "Hello world\n\nA & B <tag>"
+        );
+    }
+
+    #[test]
+    fn xml_to_text_turns_line_breaks_into_newlines() {
+        let xml = "<w:p><w:r><w:t>one</w:t></w:r><w:br/><w:r><w:t>two</w:t></w:r></w:p>";
+        assert_eq!(xml_to_text(xml, "</w:p>"), "one\ntwo");
+    }
+
+    #[test]
+    fn xml_to_text_handles_presentation_parts() {
+        let xml = concat!(
+            "<p:sld><p:cSld><p:spTree><p:sp><p:txBody>",
+            "<a:p><a:r><a:t>标题</a:t></a:r></a:p>",
+            "<a:p><a:r><a:t>正文</a:t></a:r></a:p>",
+            "</p:txBody></p:sp></p:spTree></p:cSld></p:sld>"
+        );
+        assert_eq!(xml_to_text(xml, "</a:p>"), "标题\n正文");
     }
 }

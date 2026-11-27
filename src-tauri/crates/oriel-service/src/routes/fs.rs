@@ -149,7 +149,21 @@ pub async fn preview(Query(query): Query<PathQuery>) -> ApiResult<Json<Value>> {
         })));
     }
     let target = target_of(&query)?;
-    let value = blocking(move || info::preview(&target)).await??;
+    let worker = target.clone();
+    let mut value = blocking(move || info::preview(&worker)).await??;
+    // Office documents are zip packages, so the plain byte preview is binary.
+    // 7-Zip can stream their text parts, which is better than showing nothing.
+    if value.content.is_none() {
+        let source = target;
+        let ext = value.ext.clone();
+        if let Some((text, truncated)) =
+            blocking(move || crate::ooxml::preview_text(&source, &ext)).await?
+        {
+            value.content = Some(text);
+            value.encoding = "utf8";
+            value.truncated = truncated;
+        }
+    }
     Ok(Json(json!(value)))
 }
 
@@ -235,7 +249,7 @@ pub async fn search(Query(query): Query<PathQuery>) -> ApiResult<Json<Value>> {
     let options = search::SearchOptions {
         show_hidden: flag(query.show_hidden.as_ref()),
         limit: query.limit.unwrap_or(search::SEARCH_RESULT_LIMIT as u32) as usize,
-        budget: Duration::from_millis(query.budget_ms.unwrap_or(10_000)),
+        budget: Duration::from_millis(query.budget_ms.unwrap_or(20_000)),
     };
     let root = match query.scope.as_deref() {
         Some("disk") => search::disk_root_for(&target),
@@ -290,7 +304,10 @@ pub async fn search_stream(
     let options = search::SearchOptions {
         show_hidden: flag(query.show_hidden.as_ref()),
         limit: query.limit.unwrap_or(search::SEARCH_RESULT_LIMIT as u32) as usize,
-        budget: Duration::from_millis(query.budget_ms.unwrap_or(10_000).clamp(500, 120_000)),
+        // Whole-drive searches stream; the client shows live progress and can
+        // cancel, so a longer budget beats returning an incomplete list after
+        // ten seconds. Typing another character aborts the previous run.
+        budget: Duration::from_millis(query.budget_ms.unwrap_or(45_000).clamp(500, 120_000)),
     };
 
     let roots: Vec<String> = match query.scope.as_deref() {

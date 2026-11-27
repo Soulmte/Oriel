@@ -12,6 +12,7 @@ import {
 } from "./shared";
 
 const LIST_COLUMN_LABELS: Array<{ key: ListColumnKey; label: string }> = [
+  { key: "ago", label: "多久前" },
   { key: "date", label: "修改日期" },
   { key: "size", label: "大小" },
   { key: "kind", label: "种类" },

@@ -32,10 +32,10 @@ const SPECIAL_ICONS: Record<
   string,
   { Icon: ComponentType<SFIconProps>; tint: string }
 > = {
-  home: { Icon: SFHouseFill, tint: "text-[#3d9bff]" },
+  home: { Icon: SFHouseFill, tint: "text-[var(--folder-tint)]" },
   desktop: { Icon: SFDesktopcomputer, tint: "text-[#8e8e93]" },
-  documents: { Icon: SFFolderFill, tint: "text-[#3d9bff]" },
-  downloads: { Icon: SFFolderFill, tint: "text-[#3d9bff]" },
+  documents: { Icon: SFFolderFill, tint: "text-[var(--folder-tint)]" },
+  downloads: { Icon: SFFolderFill, tint: "text-[var(--folder-tint)]" },
   pictures: { Icon: SFPhotoFill, tint: "text-[#ff7a8a]" },
   music: { Icon: SFMusicNote, tint: "text-[#ff5f8f]" },
   videos: { Icon: SFFilmFill, tint: "text-[#b48bff]" },
@@ -46,7 +46,7 @@ const SPECIAL_ICONS: Record<
 /** Fixed, removable and network volumes read as different things at a glance. */
 const DRIVE_ICONS: Record<DriveKind, { Icon: ComponentType<SFIconProps>; tint: string }> = {
   fixed: { Icon: SFInternaldriveFill, tint: "text-[#98989f]" },
-  removable: { Icon: SFExternaldriveFill, tint: "text-[#3d9bff]" },
+  removable: { Icon: SFExternaldriveFill, tint: "text-[var(--folder-tint)]" },
   network: { Icon: SFNetwork, tint: "text-[#5e5ce6]" },
   unknown: { Icon: SFExternaldriveFill, tint: "text-[#98989f]" },
 };
@@ -312,7 +312,7 @@ export function Sidebar() {
             title="常用位置、磁盘与最近打开"
             onSelect={openHome}
             compact={collapsed}
-            icon={<SFHouseFill size={16} className="shrink-0 text-[#3d9bff]" />}
+            icon={<SFHouseFill size={16} className="shrink-0 text-[var(--folder-tint)]" />}
           />
         </div>
 
@@ -323,7 +323,7 @@ export function Sidebar() {
               {specials.map((folder) => {
                 const spec = SPECIAL_ICONS[folder.icon] ?? {
                   Icon: SFFolderFill,
-                  tint: "text-[#3d9bff]",
+                  tint: "text-[var(--folder-tint)]",
                 };
                 const active =
                   route === "files" && samePath(displayPath, folder.path, platform);

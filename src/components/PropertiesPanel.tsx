@@ -161,7 +161,7 @@ export function PropertiesPanel({
             {iconEntry ? (
               <FileIcon entry={iconEntry} size={30} />
             ) : (
-              <SFFolderFill size={28} className="text-[#3d9bff]" />
+              <SFFolderFill size={28} className="text-[var(--folder-tint)]" />
             )}
           </span>
           <div className="min-w-0">

@@ -84,6 +84,25 @@ impl Matcher {
             self.needles.iter().all(|needle| lower.contains(needle.as_str()))
         }
     }
+
+    /// True when at least one token appears in the folder path, which makes the
+    /// path-based fallback below worth the allocation.
+    fn touches_dir(&self, dir_lower: &str) -> bool {
+        self.needles.len() > 1
+            && self
+                .needles
+                .iter()
+                .any(|needle| dir_lower.contains(needle.as_str()))
+    }
+
+    /// `2024 报告` should find `2024\报告.docx`: with two or more tokens the
+    /// folder names may satisfy some of them, so match against the whole path.
+    fn matches_path(&self, dir_lower: &str, name: &str) -> bool {
+        let name_lower = name.to_lowercase();
+        self.needles.iter().all(|needle| {
+            dir_lower.contains(needle.as_str()) || name_lower.contains(needle.as_str())
+        })
+    }
 }
 
 fn contains_ascii_ci(haystack: &str, needle_lower: &str) -> bool {
@@ -118,6 +137,7 @@ struct Shared {
     found: AtomicUsize,
     stop: AtomicBool,
     matcher: Matcher,
+    root: String,
     show_hidden: bool,
     limit: usize,
     deadline: Instant,
@@ -168,6 +188,7 @@ pub fn run_search(
         found: AtomicUsize::new(0),
         stop: AtomicBool::new(false),
         matcher,
+        root: root.to_string(),
         show_hidden: options.show_hidden,
         limit: options.limit.max(1),
         deadline,
@@ -258,6 +279,14 @@ fn worker(shared: Arc<Shared>, sender: mpsc::Sender<SearchEvent>) {
         shared.scanned.fetch_add(raw.len(), Ordering::Relaxed);
         since_progress += raw.len();
 
+        // Multi-token queries may match through the folder names, so the path is
+        // lowercased once per directory instead of once per entry.
+        let relative_dir = directory
+            .strip_prefix(shared.root.as_str())
+            .unwrap_or(&directory)
+            .to_lowercase();
+        let check_path = shared.matcher.touches_dir(&relative_dir);
+
         let mut subdirectories: Vec<String> = Vec::new();
         for item in &raw {
             if item.is_dir() && !item.is_link() {
@@ -269,7 +298,9 @@ fn worker(shared: Arc<Shared>, sender: mpsc::Sender<SearchEvent>) {
             if item.is_hidden() && !shared.show_hidden {
                 continue;
             }
-            if !shared.matcher.matches(&item.name) {
+            if !shared.matcher.matches(&item.name)
+                && !(check_path && shared.matcher.matches_path(&relative_dir, &item.name))
+            {
                 continue;
             }
             let next = shared.found.fetch_add(1, Ordering::Relaxed) + 1;
@@ -289,7 +320,7 @@ fn worker(shared: Arc<Shared>, sender: mpsc::Sender<SearchEvent>) {
             }
         }
 
-        if since_progress >= 4_000 {
+        if since_progress >= 1_500 {
             since_progress = 0;
             let _ = sender.send(SearchEvent::Progress(shared.scanned.load(Ordering::Relaxed)));
         }
@@ -332,5 +363,23 @@ mod tests {
         let matcher = Matcher::new("report 2024").unwrap();
         assert!(matcher.matches("2024-annual-report.pdf"));
         assert!(!matcher.matches("2024-annual.pdf"));
+    }
+
+    #[test]
+    fn multi_token_queries_match_through_folder_names() {
+        let matcher = Matcher::new("2024 报告").unwrap();
+        // The name alone is not enough…
+        assert!(!matcher.matches("报告.docx"));
+        // …but the folder it lives in satisfies the other token.
+        assert!(matcher.touches_dir(r"\archive\2024"));
+        assert!(matcher.matches_path(r"\archive\2024", "报告.docx"));
+        // A folder unrelated to the query keeps the fast path.
+        assert!(!matcher.touches_dir(r"\archive\2023"));
+    }
+
+    #[test]
+    fn single_token_queries_never_use_the_path_fallback() {
+        let matcher = Matcher::new("报告").unwrap();
+        assert!(!matcher.touches_dir(r"\archive\2024"));
     }
 }

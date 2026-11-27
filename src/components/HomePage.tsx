@@ -25,10 +25,10 @@ const SPECIAL_ICONS: Record<
   string,
   { Icon: ComponentType<SFIconProps>; tint: string }
 > = {
-  home: { Icon: SFHouseFill, tint: "text-[#3d9bff]" },
+  home: { Icon: SFHouseFill, tint: "text-[var(--folder-tint)]" },
   desktop: { Icon: SFDesktopcomputer, tint: "text-[#8e8e93]" },
-  documents: { Icon: SFFolderFill, tint: "text-[#3d9bff]" },
-  downloads: { Icon: SFFolderFill, tint: "text-[#3d9bff]" },
+  documents: { Icon: SFFolderFill, tint: "text-[var(--folder-tint)]" },
+  downloads: { Icon: SFFolderFill, tint: "text-[var(--folder-tint)]" },
   pictures: { Icon: SFPhotoFill, tint: "text-[#ff7a8a]" },
   music: { Icon: SFMusicNote, tint: "text-[#ff5f8f]" },
   videos: { Icon: SFFilmFill, tint: "text-[#b48bff]" },
@@ -38,7 +38,7 @@ const SPECIAL_ICONS: Record<
 
 const DRIVE_ICONS: Record<DriveKind, { Icon: ComponentType<SFIconProps>; tint: string }> = {
   fixed: { Icon: SFInternaldriveFill, tint: "text-[#98989f]" },
-  removable: { Icon: SFExternaldriveFill, tint: "text-[#3d9bff]" },
+  removable: { Icon: SFExternaldriveFill, tint: "text-[var(--folder-tint)]" },
   network: { Icon: SFNetwork, tint: "text-[#5e5ce6]" },
   unknown: { Icon: SFExternaldriveFill, tint: "text-[#98989f]" },
 };
@@ -103,7 +103,7 @@ export function HomePage() {
             {specials.map((folder) => {
               const spec = SPECIAL_ICONS[folder.icon] ?? {
                 Icon: SFFolderFill,
-                tint: "text-[#3d9bff]",
+                tint: "text-[var(--folder-tint)]",
               };
               return (
                 <button
@@ -214,7 +214,7 @@ export function HomePage() {
                       index > 0 && "border-t border-mac-line/60",
                     )}
                   >
-                    <SFFolderFill size={15} className="shrink-0 text-[#3d9bff]" />
+                    <SFFolderFill size={15} className="shrink-0 text-[var(--folder-tint)]" />
                     <span className="w-40 shrink-0 truncate text-[12.5px] text-mac-text">
                       {name}
                     </span>

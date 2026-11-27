@@ -233,3 +233,13 @@ html[data-motion="reduced"] *::after {
 .animate-fade-in {
   animation: mac-fade-in 140ms ease-out;
 }
+
+/**
+ * Filled accent surface: selection, primary buttons and progress bars. When the
+ * accent is a solid colour `--accent-gradient` is `none`, so the background
+ * colour alone paints it.
+ */
+.accent-fill {
+  background-color: var(--color-mac-blue);
+  background-image: var(--accent-gradient, none);
+}

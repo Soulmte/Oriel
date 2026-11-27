@@ -41,7 +41,7 @@ fn find_tool() -> Option<PathBuf> {
     None
 }
 
-fn tool() -> Result<PathBuf, CoreError> {
+pub(crate) fn tool() -> Result<PathBuf, CoreError> {
     if let Ok(cache) = SEVEN_ZIP.lock() {
         if let Some(cached) = cache.as_ref() {
             return cached.clone().ok_or_else(|| missing_tool());

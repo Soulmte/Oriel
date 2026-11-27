@@ -168,7 +168,7 @@ export function UpdatePopup() {
               className={
                 download.status === "failed"
                   ? "h-full rounded-full bg-[#ff453a] transition-[width] duration-200"
-                  : "h-full rounded-full bg-mac-blue transition-[width] duration-200"
+                  : "accent-fill h-full rounded-full transition-[width] duration-200"
               }
               style={{ width: `${percent}%` }}
             />
@@ -207,7 +207,7 @@ export function UpdatePopup() {
               type="button"
               onClick={() => void install()}
               disabled={installing}
-              className="flex h-7 items-center gap-1.5 rounded-[6px] bg-mac-blue px-2.5 text-[11.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-45"
+              className="accent-fill flex h-7 items-center gap-1.5 rounded-[6px] px-2.5 text-[11.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-45"
             >
               {installing ? <Spinner size="sm" /> : null}
               {installing ? "正在启动…" : "立即安装并退出"}
@@ -233,7 +233,7 @@ export function UpdatePopup() {
               type="button"
               onClick={() => void startDownload()}
               disabled={busy || !asset}
-              className="flex h-7 items-center gap-1.5 rounded-[6px] bg-mac-blue px-2.5 text-[11.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-45"
+              className="accent-fill flex h-7 items-center gap-1.5 rounded-[6px] px-2.5 text-[11.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-45"
             >
               {busy ? <Spinner size="sm" /> : null}
               {busy ? "下载中…" : download?.status === "failed" ? "重试" : "立即更新"}

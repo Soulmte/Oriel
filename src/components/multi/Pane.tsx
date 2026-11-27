@@ -988,7 +988,7 @@ export function Pane({
         </PaneButton>
 
         <div className="flex h-5 min-w-[90px] flex-1 items-center gap-1 rounded-[4px] bg-mac-surface px-1.5 shadow-[0_0_0_1px_var(--color-mac-line)] focus-within:ring-2 focus-within:ring-mac-blue/35">
-          <SFFolderFill size={11} className="shrink-0 text-[#3d9bff]" />
+          <SFFolderFill size={11} className="shrink-0 text-[var(--folder-tint)]" />
           <input
             value={address}
             onChange={(event) => setAddress(event.target.value)}

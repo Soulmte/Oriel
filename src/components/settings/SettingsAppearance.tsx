@@ -17,6 +17,7 @@ import {
   GRID_METRICS,
   SCALES,
 } from "../../lib/appearance";
+import { AccentPicker } from "./AccentPicker";
 import type {
   AccentKey,
   GlassLevel,
@@ -88,35 +89,9 @@ export function SettingsAppearance() {
 
         <SettingsRow
           title="强调色"
-          detail="选中项、按钮与进度条的颜色，文件夹和文件类型图标保持各自的配色"
+          detail="选中项、按钮、进度条与文件夹图标都跟着它走，也可以选渐变"
         >
-          <div className="flex items-center gap-1.5">
-            {(Object.keys(ACCENTS) as AccentKey[]).map((key) => {
-              const accent = ACCENTS[key];
-              const selected = appearance.accent === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  aria-label={accent.label}
-                  aria-pressed={selected}
-                  title={accent.label}
-                  onClick={() => setAppearance("accent", key)}
-                  className="grid size-7 place-items-center rounded-full outline-none transition-transform focus-visible:ring-2 focus-visible:ring-mac-blue/60"
-                  style={{
-                    boxShadow: selected
-                      ? `0 0 0 2px var(--color-mac-surface), 0 0 0 3.5px ${accent.color}`
-                      : undefined,
-                  }}
-                >
-                  <span
-                    className="size-4.5 rounded-full"
-                    style={{ backgroundColor: accent.color, width: 18, height: 18 }}
-                  />
-                </button>
-              );
-            })}
-          </div>
+          <AccentPicker />
         </SettingsRow>
       </SettingsSection>
 

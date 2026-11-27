@@ -1196,6 +1196,7 @@ export function FileIcon({
   shellIcon,
   thumbnailUrl,
   className,
+  selected = false,
 }: {
   entry: EntryDto;
   size?: number;
@@ -1204,13 +1205,19 @@ export function FileIcon({
   /** Server-rendered preview for image entries. */
   thumbnailUrl?: string;
   className?: string;
+  /** Selected entries sit on an accent fill, so the folder goes white. */
+  selected?: boolean;
 }) {
   if (entry.kind === "directory") {
     return (
       <SFFolderFill
         size={size}
         aria-hidden="true"
-        className={clsx("shrink-0 text-[#3d9bff]", className)}
+        className={clsx(
+          "shrink-0",
+          selected ? "text-white" : "text-[var(--folder-tint)]",
+          className,
+        )}
       />
     );
   }

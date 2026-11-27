@@ -95,33 +95,87 @@ fn api_ready(port: u16) -> bool {
     TcpStream::connect_timeout(&socket, Duration::from_millis(180)).is_ok()
 }
 
-/// Starts the embedded service unless something already listens on the port
-/// (a standalone dev service, or a second window that booted first).
+/// Version reported by a live service on `port`, or `None` when the listener is
+/// gone or is not answering our health endpoint.
+///
+/// A plain connect is not enough: right after an elevation restart the old
+/// process can still hold the port for a moment, and a half-dead service would
+/// leave every later request hanging.
+fn health_version(port: u16) -> Option<String> {
+    use std::io::{Read, Write};
+
+    let address = format!("127.0.0.1:{port}");
+    let socket = address.parse().ok()?;
+    let mut stream = TcpStream::connect_timeout(&socket, Duration::from_millis(400)).ok()?;
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(800)));
+    let _ = stream.set_write_timeout(Some(Duration::from_millis(800)));
+    stream
+        .write_all(b"GET /api/health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+        .ok()?;
+
+    let mut buffer = String::new();
+    (&mut stream).take(4096).read_to_string(&mut buffer).ok()?;
+    let start = buffer.find("\"version\"")?;
+    let rest = &buffer[start + "\"version\"".len()..];
+    let rest = rest.trim_start().strip_prefix(':')?.trim_start();
+    let rest = rest.strip_prefix('"')?;
+    Some(rest[..rest.find('"')?].to_string())
+}
+
+fn wait_for_port_to_free(port: u16, limit: Duration) -> bool {
+    let deadline = Instant::now() + limit;
+    while Instant::now() < deadline {
+        if !api_ready(port) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(150));
+    }
+    !api_ready(port)
+}
+
+/// Starts the embedded service unless a matching one already answers.
 pub fn ensure_service(app: &AppHandle) {
     let port = api_port();
-    log(&format!("ensure_service port {port}"));
-    if api_ready(port) {
-        log("port already served");
-        return;
-    }
+    let expected = app.package_info().version.to_string();
 
-    // The updater reads its mirror settings from `option_env!` in
-    // oriel-service; do not shadow them with runtime overrides here.
-    let state = oriel_service::AppState::new(port, app.package_info().version.to_string());
-    tauri::async_runtime::spawn(async move {
-        let address = std::net::SocketAddr::from(([127, 0, 0, 1], port));
-        if let Err(error) = oriel_service::serve(state, address).await {
-            log(&format!("service stopped: {error}"));
-        }
-    });
-
-    // Wait briefly so the first paint already has a live service.
-    let deadline = Instant::now() + Duration::from_secs(8);
-    while Instant::now() < deadline {
-        if api_ready(port) {
+    if let Some(version) = health_version(port) {
+        if version == expected {
+            log("service already running");
             return;
         }
-        std::thread::sleep(Duration::from_millis(80));
+        log(&format!(
+            "stale service {version} on {port}, waiting for it to exit"
+        ));
+        wait_for_port_to_free(port, Duration::from_secs(10));
+    } else if api_ready(port) {
+        // Something listens but does not answer `/api/health`: most likely the
+        // previous instance finishing its shutdown.
+        log(&format!("port {port} held by an unresponsive listener"));
+        wait_for_port_to_free(port, Duration::from_secs(10));
+    }
+
+    for attempt in 1..=3 {
+        // The updater reads its mirror settings from `option_env!` in
+        // oriel-service; do not shadow them with runtime overrides here.
+        let state = oriel_service::AppState::new(port, expected.clone());
+        tauri::async_runtime::spawn(async move {
+            let address = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+            if let Err(error) = oriel_service::serve(state, address).await {
+                log(&format!("service stopped: {error}"));
+            }
+        });
+
+        // Wait briefly so the first paint already has a live service.
+        let deadline = Instant::now() + Duration::from_secs(8);
+        while Instant::now() < deadline {
+            if health_version(port).as_deref() == Some(expected.as_str()) {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(120));
+        }
+
+        log(&format!("service did not answer on attempt {attempt}"));
+        wait_for_port_to_free(port, Duration::from_secs(3));
     }
 }
 
@@ -438,13 +492,17 @@ pub fn install_update(app: AppHandle, path: String) -> Result<(), String> {
         .unwrap_or_default()
         .to_ascii_lowercase();
     let target = canonical.to_string_lossy().to_string();
-    // Launch the installer directly instead of going through `cmd /C start`:
-    // the shell mangles paths with non-ASCII characters or `&`.
+    // Silent installs: the user already said yes in the update card, so the
+    // installer should not walk them through uninstall/install pages again.
     let mut command = match ext.as_str() {
-        "exe" => Command::new(&target),
+        "exe" => {
+            let mut command = Command::new(&target);
+            command.arg("/S");
+            command
+        }
         "msi" => {
             let mut command = Command::new("msiexec");
-            command.args(["/i", &target]);
+            command.args(["/i", &target, "/passive"]);
             command
         }
         _ => return Err("不支持的安装包类型".into()),
@@ -556,6 +614,13 @@ pub fn open_log_folder() -> Result<(), String> {
 /// Explorer: Windows has no API to replace the shell itself.
 const DIRECTORY_OPEN_KEY: &str = r"HKCU\Software\Classes\Directory\shell\open\command";
 const DRIVE_OPEN_KEY: &str = r"HKCU\Software\Classes\Drive\shell\open\command";
+/// The `Folder` class is what the shell uses for the folder verbs it runs
+/// itself; an empty `DelegateExecute` makes it execute the command line instead
+/// of its built-in handler.
+const FOLDER_VERB_KEYS: [&str; 2] = [
+    r"HKCU\Software\Classes\Folder\shell\open",
+    r"HKCU\Software\Classes\Folder\shell\explore",
+];
 
 fn registry_default_value(key: &str) -> Option<String> {
     let output = reg(&["query", key, "/ve"]).output().ok()?;
@@ -567,6 +632,20 @@ fn registry_default_value(key: &str) -> Option<String> {
         .find(|line| line.contains("REG_SZ"))
         .and_then(|line| line.split("REG_SZ").nth(1))
         .map(|value| value.trim().to_string())
+}
+
+/// The shell caches verb resolution; without this the new association only
+/// takes effect after an Explorer restart.
+fn notify_shell_of_associations() {
+    #[cfg(windows)]
+    unsafe {
+        windows::Win32::UI::Shell::SHChangeNotify(
+            windows::Win32::UI::Shell::SHCNE_ASSOCCHANGED,
+            windows::Win32::UI::Shell::SHCNF_IDLIST,
+            None,
+            None,
+        );
+    }
 }
 
 fn default_handler_installed() -> bool {
@@ -593,6 +672,8 @@ pub fn set_default_file_manager(enabled: bool) -> Result<bool, String> {
         for key in [
             r"HKCU\Software\Classes\Directory\shell\open",
             r"HKCU\Software\Classes\Drive\shell\open",
+            r"HKCU\Software\Classes\Folder\shell\open",
+            r"HKCU\Software\Classes\Folder\shell\explore",
             prog_id,
             r"HKCU\Software\Classes\Directory\OpenWithProgids\Oriel.Folder",
             r"HKCU\Software\Classes\Drive\OpenWithProgids\Oriel.Folder",
@@ -600,9 +681,12 @@ pub fn set_default_file_manager(enabled: bool) -> Result<bool, String> {
         ] {
             let _ = reg(&["delete", key, "/f"]).status();
         }
+        notify_shell_of_associations();
         return Ok(false);
     }
 
+    // Verify instead of trusting the exit code: a half-written key is worse
+    // than a clear failure.
     for (index, key) in [DIRECTORY_OPEN_KEY, DRIVE_OPEN_KEY].iter().enumerate() {
         let status = reg(&[
             "add",
@@ -617,9 +701,37 @@ pub fn set_default_file_manager(enabled: bool) -> Result<bool, String> {
         .status();
         let ok = status.map(|status| status.success()).unwrap_or(false);
         // The folder key is what actually takes over; the drive one is a bonus.
-        if index == 0 && !ok {
-            return Err("无法写入文件夹关联".into());
+        if index == 0 && (!ok || !default_handler_installed()) {
+            return Err("无法写入文件夹关联，请确认安全软件没有拦截注册表写入".into());
         }
+    }
+
+    // The shell's own folder verbs: blank DelegateExecute hands the command
+    // line to us instead of the stock handler.
+    for key in FOLDER_VERB_KEYS {
+        let _ = reg(&[
+            "add",
+            &format!("{key}\\command"),
+            "/ve",
+            "/t",
+            "REG_SZ",
+            "/d",
+            &format!("{exe} \"%1\""),
+            "/f",
+        ])
+        .status();
+        let _ = reg(&[
+            "add",
+            key,
+            "/v",
+            "DelegateExecute",
+            "/t",
+            "REG_SZ",
+            "/d",
+            "",
+            "/f",
+        ])
+        .status();
     }
 
     // (key, value name — None means the key's default value, data)
@@ -689,6 +801,7 @@ pub fn set_default_file_manager(enabled: bool) -> Result<bool, String> {
     ])
     .status();
 
+    notify_shell_of_associations();
     Ok(true)
 }
 
@@ -716,5 +829,30 @@ pub fn handle_window_event(window: &tauri::Window, event: &WindowEvent) {
             api.prevent_close();
             let _ = window.hide();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The association is only reported as installed when the value we just
+    /// wrote parses back, so a broken parser would make the switch fail on
+    /// every attempt.
+    #[test]
+    fn registry_value_round_trips() {
+        let key = r"HKCU\Software\Classes\Oriel.TestProbe";
+        let value = r#""C:\Program Files\Oriel\oriel.exe" "%1""#;
+        let status = reg(&["add", key, "/ve", "/t", "REG_SZ", "/d", value, "/f"])
+            .status();
+        if !status.map(|status| status.success()).unwrap_or(false) {
+            // No registry access in this environment; nothing to assert.
+            return;
+        }
+
+        let read = registry_default_value(key).expect("value should parse back");
+        assert_eq!(read, value);
+
+        let _ = reg(&["delete", key, "/f"]).status();
     }
 }

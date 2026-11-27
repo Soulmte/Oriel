@@ -110,7 +110,7 @@ export interface ContextMenuState {
 export type Route = "files" | "home" | "settings" | "recycle" | "processes" | "ports" | "cleanup" | "uninstaller";
 export type StartLocation = "last" | "home" | "start";
 /** Optional list columns; the name column is always shown. */
-export type ListColumnKey = "date" | "size" | "kind";
+export type ListColumnKey = "date" | "ago" | "size" | "kind";
 
 interface ClipboardState {
   mode: "copy" | "cut";
@@ -333,6 +333,8 @@ interface ExplorerState {
   reveal: (target: string) => Promise<void>;
 
   setQuery: (query: string) => void;
+  /** Stops the running walk and keeps the matches found so far. */
+  stopSearch: () => void;
   setSearchScope: (scope: SearchScope) => void;
   loadShellIcons: (entries: EntryDto[]) => Promise<void>;
   /** Queues folder sizes; calls inside one tick are batched into one request. */
@@ -570,7 +572,7 @@ function readLayout(): PaneLayout {
   return readString<PaneLayout>(PREF.layout, "1", ["1", "2", "3", "4"]);
 }
 
-const LIST_COLUMNS: ListColumnKey[] = ["date", "size", "kind"];
+const LIST_COLUMNS: ListColumnKey[] = ["ago", "date", "size", "kind"];
 
 function readListColumns(): ListColumnKey[] {
   try {
@@ -594,6 +596,8 @@ function writePreference(key: string, value: string | boolean): void {
 }
 
 let initStarted = false;
+/** Consecutive failed `init()` runs; cleared once the listing loads. */
+let initAttempts = 0;
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 /** The live search stream; closing it aborts the walk on the server. */
 let searchSource: EventSource | null = null;
@@ -933,6 +937,7 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
       ]);
 
       set({ system, specials, drives, ready: true, online: true });
+      initAttempts = 0;
 
       const home = specials.find((folder) => folder.id === "home")?.path ?? system.home;
       const saved = localStorage.getItem(LAST_PATH_KEY);
@@ -963,6 +968,15 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
         loading: false,
         error: errorMessage(error),
       });
+      // A service that was still coming up (or restarting after an elevation)
+      // must not leave the window empty for the rest of the session.
+      initAttempts += 1;
+      if (initAttempts <= 5) {
+        setTimeout(() => {
+          initStarted = false;
+          void get().init();
+        }, 2000 * initAttempts);
+      }
     }
   },
 
@@ -1109,6 +1123,9 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
       void get().init();
       return;
     }
+    // Sizes are measured lazily and cached for the session; an explicit
+    // refresh has to forget them.
+    set({ folderSizes: {} });
     void get().navigate(path, { history: "none" });
   },
 
@@ -1650,6 +1667,13 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
     if (get().query.trim()) get().setQuery(get().query);
   },
 
+  stopSearch() {
+    closeSearchStream();
+    searchSeq += 1;
+    // Keep what was already found; the header marks it as partial.
+    set({ searching: false, searchTruncated: true });
+  },
+
   setQuery(query) {
     set({ query });
 
@@ -2138,7 +2162,16 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
 
       const alive = new Set(next.map((entry) => entry.path));
       const selected = get().selected.filter((item) => alive.has(item));
-      set({ entries: next, selected, anchor: selected[0] ?? null });
+      // Cached folder sizes go stale as soon as anything inside changes, so
+      // forget the affected ones and let the visible rows measure again.
+      const sizes = { ...get().folderSizes };
+      for (const item of next) {
+        if (item.kind === "directory") delete sizes[item.path];
+      }
+      for (const item of previous.values()) {
+        if (!alive.has(item.path)) delete sizes[item.path];
+      }
+      set({ entries: next, selected, anchor: selected[0] ?? null, folderSizes: sizes });
       void get().loadShellIcons(next);
     } catch {
       // A folder that disappeared mid-refresh is handled by the next navigation.

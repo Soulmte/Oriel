@@ -103,7 +103,7 @@ function GridTile({
           drop.active
             ? "bg-mac-blue/25 ring-2 ring-mac-blue"
             : isSelected
-              ? "bg-mac-blue/90 shadow-sm"
+              ? "accent-fill shadow-sm"
               : "group-hover:bg-black/[0.05] dark:group-hover:bg-white/[0.08]",
         )}
       >
@@ -111,6 +111,7 @@ function GridTile({
           entry={entry}
           size={metrics.iconSize}
           shellIcon={shellIcon}
+          selected={isSelected && !drop.active}
           thumbnailUrl={
             showThumbnails ? thumbnailFor(entry, metrics.iconSize * 2) : undefined
           }
